@@ -1,0 +1,5 @@
+txn_ref,booked_at,gross_value,currency_code,channel
+T-7001,2025-02-12T08:35:00,56.20,USD,web
+T-7002,2025-02-12T09:11:00,-4.00,USD,mobile
+T-7003,2025-02-13T14:03:00,103.75,EUR,branch
+T-7004,2025-02-14T17:28:00,23.10,USD,web

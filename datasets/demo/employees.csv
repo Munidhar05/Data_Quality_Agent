@@ -1,0 +1,5 @@
+worker_ref,started_on,team,location,status,weekly_hours
+W-021,2022-08-15,operations,West,active,40
+W-022,2023-03-02,research,North,active,36
+W-023,2021-11-30,operations,East,leave,
+W-024,2024-07-10,design,Remote,pending,42

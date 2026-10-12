@@ -1,0 +1,112 @@
+[
+  {
+    "rule_id": "DQ-COMPLETENESS",
+    "version": "1.0",
+    "name": "Completeness",
+    "category": "completeness",
+    "description": "Check that configured columns are populated.",
+    "applies_to": "any column",
+    "predicate": "not_null",
+    "severity": "high",
+    "configuration": {"columns": "list of dataset columns; defaults to all columns"}
+  },
+  {
+    "rule_id": "DQ-UNIQUENESS",
+    "version": "1.0",
+    "name": "Uniqueness",
+    "category": "uniqueness",
+    "description": "Check for duplicate values in selected columns.",
+    "applies_to": "any column; strongest evidence comes from identifier-like cardinality",
+    "predicate": "unique",
+    "severity": "medium",
+    "configuration": {"columns": "list of dataset columns"}
+  },
+  {
+    "rule_id": "DQ-DUPLICATE-ROWS",
+    "version": "1.0",
+    "name": "Duplicate rows",
+    "category": "uniqueness",
+    "description": "Check whether complete rows are duplicated.",
+    "applies_to": "any tabular dataset",
+    "predicate": "unique_rows",
+    "severity": "medium",
+    "configuration": {}
+  },
+  {
+    "rule_id": "DQ-SEMANTIC-FORMAT",
+    "version": "1.0",
+    "name": "Semantic format",
+    "category": "validity",
+    "description": "Check values against a format supported by inferred semantic evidence.",
+    "applies_to": "columns with a high-confidence semantic format candidate",
+    "predicate": "semantic_format",
+    "severity": "medium",
+    "configuration": {"column": "dataset column with a supported semantic candidate"}
+  },
+  {
+    "rule_id": "DQ-NUMERIC-BOUNDS",
+    "version": "1.0",
+    "name": "Numeric bounds",
+    "category": "validity",
+    "description": "Check numeric values against user-defined inclusive minimum and maximum bounds.",
+    "applies_to": "numeric columns",
+    "predicate": "numeric_bounds",
+    "severity": "medium",
+    "configuration": {"column": "numeric dataset column", "minimum": "optional number", "maximum": "optional number"}
+  },
+  {
+    "rule_id": "DQ-APPROVED-VALUES",
+    "version": "1.0",
+    "name": "Approved values",
+    "category": "validity",
+    "description": "Check categorical values against a user-provided approved domain.",
+    "applies_to": "categorical or discrete columns",
+    "predicate": "allowed_values",
+    "severity": "medium",
+    "configuration": {"column": "dataset column", "values": "user-approved list of values"}
+  },
+  {
+    "rule_id": "DQ-REFERENTIAL-INTEGRITY",
+    "version": "1.0",
+    "name": "Referential integrity",
+    "category": "consistency",
+    "description": "Check values against an explicitly supplied reference set.",
+    "applies_to": "a column and a user-supplied reference set",
+    "predicate": "in_reference",
+    "severity": "high",
+    "configuration": {"column": "dataset column", "reference_values": "explicit user-supplied list"}
+  },
+  {
+    "rule_id": "DQ-CROSS-COLUMN",
+    "version": "1.0",
+    "name": "Cross-column condition",
+    "category": "consistency",
+    "description": "Compare two columns using an explicitly approved operator.",
+    "applies_to": "two compatible dataset columns and a user-defined condition",
+    "predicate": "column_comparison",
+    "severity": "high",
+    "configuration": {"left": "dataset column", "operator": "<, <=, ==, !=, >=, >", "right": "dataset column"}
+  },
+  {
+    "rule_id": "DQ-PATTERN-MATCH",
+    "version": "1.0",
+    "name": "Pattern match",
+    "category": "validity",
+    "description": "Check text values against a user-provided regular expression.",
+    "applies_to": "text columns and an explicitly supplied pattern",
+    "predicate": "regex_match",
+    "severity": "medium",
+    "configuration": {"column": "text dataset column", "pattern": "user-provided regular expression"}
+  },
+  {
+    "rule_id": "DQ-TYPE-CONSISTENCY",
+    "version": "1.0",
+    "name": "Type consistency",
+    "category": "validity",
+    "description": "Check that non-missing values conform to an explicitly selected type.",
+    "applies_to": "any dataset column and a user-approved target type",
+    "predicate": "castable_type",
+    "severity": "medium",
+    "configuration": {"column": "dataset column", "target_type": "number, date, or boolean"}
+  }
+]

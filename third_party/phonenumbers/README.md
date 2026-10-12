@@ -1,0 +1,3 @@
+Country calling codes in frontend/country-codes.json are derived from the country-to-region metadata in python-phonenumbers (https://github.com/daviddrysdale/python-phonenumbers), retrieved 2026-10-09. Copyright 2009 The Libphonenumber Authors. Licensed under the Apache License, Version 2.0; see LICENSE. Non-geographic service codes (region 001) are excluded. Country names use the browser Intl.DisplayNames API.
+
+National phone lengths are derived from Google libphonenumber PhoneNumberMetadata.xml (https://github.com/google/libphonenumber), retrieved 2026-10-09, Apache-2.0. India is constrained to 10 digits as requested. Local-only lengths and domestic dialing prefixes are excluded.

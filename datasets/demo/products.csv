@@ -1,0 +1,5 @@
+sku,display_name,product_group,unit_cost,available
+P-01,Notebook,stationery,4.25,true
+P-02,Desk lamp,home,18.50,true
+P-03,Refill pack,stationery,,false
+P-04,Travel mug,accessories,12.00,true

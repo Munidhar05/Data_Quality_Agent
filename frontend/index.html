@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F37024">
+  <title>Feuji Data Quality Agent</title>
+  <link rel="icon" type="image/svg+xml" href="/static/feuji-logo.svg?v=2">
+  <link rel="stylesheet" href="/static/styles.css?v=ai-status-topbar-41">
+</head>
+<body class="auth-pending">
+<section id="auth-page" class="auth-page" aria-label="Account access">
+<div class="auth-story"><video class="auth-background-video" autoplay muted loop playsinline preload="metadata" aria-hidden="true" tabindex="-1"><source src="/static/Sign_in_video.mp4" type="video/mp4"></video><img src="/static/feuji-logo.svg" alt="Feuji" width="110"><div><p class="eyebrow">FEUJI DATA QUALITY</p><h1>Better data.<br>Confident decisions.</h1><p>One workspace to profile your files, check data quality, and turn results into action.</p><div class="auth-steps">01 &nbsp; Upload &nbsp;&nbsp; 02 &nbsp; Check &nbsp;&nbsp; 03 &nbsp; Download</div></div><small>Your data quality journey starts here.</small></div>
+<div class="auth-panel"><div class="auth-card"><p class="eyebrow">WELCOME TO FEUJI DATA QUALITY</p><h2 id="auth-heading">Welcome back</h2><p id="auth-description">Sign in to your data quality workspace.</p>
+<form id="auth-form"><div id="signup-fields" class="auth-fields" hidden><label class="">First name<input name="first_name" type="text" autocomplete="given-name" maxlength="100" required disabled></label><label class="">Last name<input name="last_name" type="text" autocomplete="family-name" maxlength="100" required disabled></label><label class="auth-wide">Company<input name="company" type="text" autocomplete="organization" maxlength="200" required disabled></label><div class="auth-wide"><div class="auth-phone-row"><label>Country code<select name="country_code" id="country-code" autocomplete="tel-country-code" disabled><option value="+91">India (+91)</option><option value="+1">US / Canada (+1)</option><option value="+44">UK (+44)</option><option value="+61">Australia (+61)</option><option value="+65">Singapore (+65)</option><option value="+971">UAE (+971)</option></select></label><label>Phone number<input name="phone" id="phone-number" type="tel" inputmode="numeric" autocomplete="tel-national" minlength="10" maxlength="10" pattern="[0-9]{10}" placeholder="9876543210" disabled></label></div></div></div>
+<label>Email address<input name="email" type="email" autocomplete="username" maxlength="254" placeholder="you@company.com" required></label>
+<label>Password<div class="auth-password"><input id="auth-password" name="password" type="password" autocomplete="current-password" maxlength="128" required><button id="toggle-password" type="button" aria-label="Show password">Show</button></div></label>
+<small id="password-hint" hidden>Use at least 8 characters.</small><p id="auth-message" role="status" aria-live="polite"></p><button id="auth-submit" type="submit" class="button button-primary full-width">Sign in</button></form>
+<p class="auth-switch"><span id="auth-switch-prompt">Don't have an account?</span> <button id="switch-auth" type="button">Sign up</button></p></div></div></section>
+  <aside class="rail" aria-label="Main navigation">
+    <a class="brand-mark" href="/upload-file" data-page="overview" aria-label="Feuji home"><img src="/static/feuji-logo.svg" alt="Feuji" width="70" height="32"></a>
+    <button class="rail-link active" data-page="overview"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg><span>Upload file</span></button>
+    <button class="rail-link" data-page="review" data-needs-file disabled><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m3 6 2 2 4-4m-6 9 2 2 4-4m-6 9 2 2 4-4M13 6h8M13 13h8M13 20h8"/></svg><span>Choose checks</span></button>
+    <button class="rail-link" data-page="business" data-needs-file disabled><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4"/></svg><span>Business Rules</span></button>
+    <button class="rail-link" data-page="results" data-needs-results disabled><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 3v18h17M8 17v-5m5 5V8m5 9V5"/></svg><span>Results</span></button>
+    <div class="nav-secondary"><p class="nav-caption">MORE</p>
+      <button class="rail-link" data-page="profile" data-needs-file disabled><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm0 0v6h6M8 13h8M8 17h5"/></svg><span>File details</span></button>
+      <button class="rail-link" data-page="history"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>History</span></button>
+      <button class="rail-link" data-page="rules"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Zm-4 9 3 3 5-6"/></svg><span>Available checks</span></button>
+    </div>
+    <div class="rail-bottom"><span id="account-name"></span><button id="logout-button" class="sidebar-logout" type="button" aria-label="Log out" title="Log out"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3v9M7 5.8a8 8 0 1 0 10 0"/></svg></button></div>
+  </aside>
+
+  <main class="workspace">
+    <header class="topbar">
+      <div class="breadcrumb"><a class="home-title-link" href="/upload-file" data-page="overview" aria-label="Feuji Data Quality — Upload file"><strong>Feuji Data Quality</strong></a></div>
+      
+      <span id="ai-status-dot" class="ai-status-dot" role="img" aria-label="AI is not enabled" title="AI is not enabled"></span>
+    </header>
+<div class="upload-processing hidden" id="agent-status" role="status" aria-live="polite" aria-atomic="true"><span id="agent-indicator" aria-hidden="true"></span><div><strong id="agent-title"></strong><p id="agent-detail"></p></div></div><section class="page active" id="page-overview" data-page-content="overview">
+      <div class="page-heading"><div><p class="eyebrow">UPLOAD & PROFILE</p><h1 id="upload-heading">Upload your file</h1><p class="lede" id="upload-help">Choose a file below to see its data profile.</p></div></div>
+      <div id="notice" class="notice hidden" role="status"></div>
+      <div id="welcome-upload" class="upload-surface">
+        <div class="upload-copy"><span class="upload-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg></span><div><h2>Upload a CSV or Parquet file</h2><p>Browse your computer or drag and drop a file here.</p></div></div>
+        <label class="file-picker"><input id="file-input" type="file" accept=".csv,.parquet,.pq,text/csv,application/vnd.apache.parquet"><span>Choose file</span><small>CSV or Parquet · up to 50 MB</small></label>
+        <div class="drop-target" id="drop-target">or drop a file here</div>
+      </div>
+      <div id="workspace-content" class="hidden">
+        <div class="dataset-strip"><div class="dataset-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg></div><div class="dataset-name-block"><span class="eyebrow">YOUR FILE</span><h2 id="active-dataset-name">—</h2><span id="active-dataset-source" class="muted"></span></div><div class="dataset-actions"><button class="button button-primary" id="view-file-data">View file data</button><button class="button button-quiet" id="replace-dataset">Upload another file</button></div></div>
+        <div class="metric-row" id="dashboard-metrics"></div>
+        <nav class="step-navigation" aria-label="Upload step navigation"><div class="step-navigation-info"><strong>File uploaded successfully</strong><span>Next, review the suggested checks.</span></div><div class="step-navigation-buttons"><button class="button button-primary" type="button" data-page="review">Next <span aria-hidden="true">&rarr;</span></button></div></nav>
+      </div>
+      
+    </section>
+
+    <section class="page" id="page-profile" data-page-content="profile">
+      <div class="compact-heading"><div><p class="eyebrow">FILE DETAILS</p><h1>File Details</h1><p class="lede">Review the file summary and column details below, or browse your uploaded records.</p></div></div>
+      <div id="profile-page-content" class="profile-page-content"><div class="empty-state">Upload a file first to see its details.</div></div>
+    </section>
+
+    <section class="page" id="page-review" data-page-content="review">
+      <div class="compact-heading"><div><p class="eyebrow">CHOOSE CHECKS</p><h1>Choose what to check</h1><p class="lede">Mandatory checks run automatically. Review suggested tests, choose columns and settings, then continue to Business Rules.</p></div></div>
+      <div id="review-page-content" class="review-layout"><div class="empty-state">Upload a file first, then choose your checks.</div></div>
+    </section>
+
+    <section class="page" id="page-business" data-page-content="business"><div class="compact-heading business-page-heading"><div><p class="eyebrow">BUSINESS RULES</p><h1>Business Rules</h1><p class="lede">Add your conditions, review their interpretation, then run validation with your selected checks.</p></div><div id="business-upload-slot"></div></div><div id="business-page-content"><div class="empty-state">Upload a file first to add business rules.</div></div></section>
+
+    <section class="page" id="page-rules" data-page-content="rules">
+      <div class="compact-heading"><div><p class="eyebrow">AVAILABLE CHECKS</p><h1>What can you check?</h1><p class="lede">Explore 100 data quality checks, grouped into 15 categories.</p></div></div>
+      <div id="rules-page-content" class="registry-list"><div class="empty-state">Loading available checks…</div></div>
+    </section>
+
+    <section class="page" id="page-history" data-page-content="history">
+      <div class="compact-heading"><div><p class="eyebrow">HISTORY</p><h1>Your checked files</h1><p class="lede">See which files you checked and when. Select a file to view its quality report and download accepted and rejected records.</p></div></div>
+      <div id="history-page-content" class="history-content"><div class="empty-state">No files checked yet. Your checked files will appear here.</div></div>
+    </section>
+
+    <section class="page" id="page-results" data-page-content="results">
+      <div class="compact-heading"><div><p class="eyebrow">RESULTS & REPORT</p><h1>Data Quality Summary Report</h1><p class="lede">Download rows that passed and rows that need attention. Check the reasons below.</p></div></div>
+      <div id="results-page-content" class="results-content"></div>
+      <nav class="step-navigation" aria-label="Results step navigation"><div class="step-navigation-info"><strong>Validation complete</strong><span>Review your checks or upload another file.</span></div><div class="step-navigation-buttons"><button class="button button-quiet" id="back-to-review" type="button"><span aria-hidden="true">&larr;</span> Previous</button><button class="button button-primary" id="start-new-upload" type="button">Upload another file</button></div></nav>
+    </section>
+
+    <footer class="page-footer"><span>FEUJI DATA QUALITY AGENT</span><span>UPLOAD / CHECK / DOWNLOAD</span><span id="footer-engine">ENGINE 0.1.0</span></footer>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/static/check-catalog.js?v=19-checks-32" defer></script>
+  <script src="/static/app.js?v=ai-status-topbar-41" defer></script>
+  <script src="/static/auth.js?v=page-routes-24" defer></script>
+</body>
+</html>

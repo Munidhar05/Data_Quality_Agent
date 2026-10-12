@@ -1,0 +1,5 @@
+order_ref,buyer_ref,placed_at,line_count,order_total,state
+O-501,C-100,2025-05-01,2,125.00,packed
+O-502,C-101,2025-05-02,1,39.95,shipped
+O-503,C-999,2025-05-02,3,0.00,hold
+O-503,C-102,2025-05-04,2,18.00,packed

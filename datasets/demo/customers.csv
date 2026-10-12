@@ -1,0 +1,5 @@
+customer_ref,corporate_contact,region,created_at,consent_flag,annual_spend
+C-100,ria@example.org,North,2024-01-12,true,1280.50
+C-101,sam@example.org,West,2024-02-08,false,930.00
+C-102,,North,2024-03-19,true,156.25
+C-102,lee@example.org,South,2024-04-03,true,-12.00
