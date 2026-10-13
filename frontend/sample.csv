@@ -1,0 +1,5 @@
+id,amount,status,email
+001,100,active,alex@example.com
+002,-10,active,invalid-email
+002,-10,active,invalid-email
+003,,inactive,sam@example.com

@@ -25,7 +25,10 @@ class UserEdit(auth.Registration):
 
 @login_router.post("/login")
 def login(data: AdminCredentials, request: Request, response: Response):
-    if not hmac.compare_digest(data.password.encode(), os.environ.get("DQ_ADMIN_PASSWORD", "admin").encode()):
+    configured_password = os.environ.get("DQ_ADMIN_PASSWORD", "")
+    if not configured_password.strip():
+        raise HTTPException(503, "Administration is unavailable. Ask the server administrator to configure DQ_ADMIN_PASSWORD.")
+    if not hmac.compare_digest(data.password.encode(), configured_password.encode()):
         raise HTTPException(401, "Incorrect administrator password.")
     token = secrets.token_urlsafe(32)
     with auth.connect() as db:

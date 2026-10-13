@@ -72,14 +72,14 @@ TESTS = r"""
   await uploadReferenceFile(input);
   assert(JSON.parse(document.querySelector('[data-value-type="json"]').value).reference_dataset_id==='reference','Reference upload');
   document.querySelector('.delete-test').click();
-  const run={dataset_name:'sample',run_id:'run',validated_at:'2026-10-09T00:00:00Z',row_count:2,accepted_count:2,rejected_count:0,score:{value:100},dataset_profile:state.profile,rules_selected:[supportedCatalog.find(r=>r.catalog_number===5)],failures:[],failure_count:0,warnings:[],check_results:[{rule_id:'DQ-CATALOG-005',status:'PASS'}]};
+  const run={dataset_id:'sample',dataset_name:'sample',run_id:'run',validated_at:'2026-10-09T00:00:00Z',row_count:2,accepted_count:2,rejected_count:0,score:{value:100},dataset_profile:state.profile,rules_selected:[supportedCatalog.find(r=>r.catalog_number===5)],failures:[],failure_count:0,warnings:[],check_results:[{rule_id:'DQ-CATALOG-005',status:'PASS'}]};
   let submitted;
-  window.fetch=async(path,options={})=>{if(path==='/api/runs'){submitted=JSON.parse(options.body);return{ok:true,status:200,json:async()=>run};}return{ok:true,status:200,json:async()=>({columns:['id','amount'],rows:[{id:1,amount:'2026-10-09T00:00:00'}],total_count:1})};};
+  window.fetch=async(path,options={})=>{if(path.endsWith('/profile'))return{ok:true,status:200,json:async()=>({dataset:state.dataset,profile:state.profile,recommendations:state.recommendations})};if(path==='/api/runs'){submitted=JSON.parse(options.body);return{ok:true,status:200,json:async()=>run};}return{ok:true,status:200,json:async()=>({columns:['id','amount'],rows:[{id:1,amount:'2026-10-09T00:00:00'}],total_count:1})};};
   await runValidation({currentTarget:byId('approve-run')});
   assert(submitted.selected_rules[0].rule_id==='DQ-CATALOG-005','Mandatory duplicate included');
   assert(byId('page-results').classList.contains('active'),'Results opens');
   assert(byId('back-to-review').closest('.step-navigation'),'Results Previous at bottom');
-  byId('back-to-review').click();assert(byId('page-business').classList.contains('active'),'Results Previous opens business rules');
+  byId('back-to-review').click();await new Promise(resolve=>setTimeout(resolve,0));assert(byId('page-business').classList.contains('active'),'Results Previous opens business rules');
   assert(byId('business-form').closest('#page-business'),'Business form in separate page');
   byId('business-input').value='amount greater than 0';
   document.querySelector('#page-business [data-step-previous]').click();
@@ -89,7 +89,7 @@ TESTS = r"""
   assert(byId('business-input').value==='amount greater than 0','Business draft persists');
   assert(byId('business-input').tagName==='TEXTAREA','Large multiline rules editor');
   assert(!byId('business-document').hasAttribute('accept'),'Any file can be selected');
-  assert(parseInt(getComputedStyle(byId('business-input')).minHeight)>=280,'Spacious editor');
+  assert(parseInt(getComputedStyle(byId('business-input')).minHeight)===160,'Compact rules editor');
   let batch;
   window.fetch=async(path,options)=>{batch=JSON.parse(options.body);return{ok:true,status:200,json:async()=>({rules:[{status:'PARSED',type:'comparison',column:'amount',operator:'>',value:0,original_requirement:'amount greater than 0'}],unresolved:[],message:'Review rules'})};};
   byId('business-input').value='1. amount greater than 0\n2. id greater than 0';
@@ -98,6 +98,19 @@ TESTS = r"""
   assert(state.businessRules.length===1,'Generated business rules added');
   await parseBusinessRule({preventDefault(){}});
   assert(state.businessRules.length===1,'Repeated batch does not duplicate rules');
+  const originalLengthText='region column contains only 4 characters';
+  const lengthRule={status:'PARSED',type:'text_length',column:'delivery_region',operator:'==',length:4,original_requirement:originalLengthText};
+  byId('business-input').value=originalLengthText;
+  applyBusinessBatch({rules:[],unresolved:[{requirement:originalLengthText,status:'NOT_APPLIED',reason:'Multiple schema columns match the field description.',candidate_columns:[{name:'billing_region'},{name:'delivery_region'}],choices:[]}],message:'Not applied'});
+  assert(!document.querySelector('[data-clarify-choice]')&&!document.querySelector('[data-clarify-reply]'),'No clarification questions shown');
+  assert(byId('business-feedback').textContent.includes('Not applied')&&byId('business-feedback').textContent.includes('billing_region'),'Unapplied reason and schema evidence shown');
+  renderClarificationChoices();
+  assert(document.querySelector('[data-exclude-unapplied]'),'Unapplied notice survives rerender');
+  document.querySelector('[data-exclude-unapplied]').onclick();
+  assert(state.businessClarifications.length===0&&byId('business-input').value==='','Exclude clears pending requirement');
+  applyBusinessBatch({rules:[lengthRule],unresolved:[],message:'Interpreted offline'});
+  assert(state.businessRules.some(rule=>rule.type==='text_length'),'Explicit length rule added');
+  assert(formatBusinessRule(lengthRule).includes('exactly 4 characters'),'Character length displayed');
   window.fetch=async()=>({ok:true,status:200,json:async()=>({columns:['id','amount'],rows:[{id:1,amount:'2026-10-09T00:00:00'}],total_count:1})});
 
   showPage('results');
@@ -138,6 +151,12 @@ TESTS = r"""
   saveDownload=originalSaveDownload;
   renderProfile();await loadExplorer();
   assert(getComputedStyle(byId('explorer-table').querySelector('td')).whiteSpace==='nowrap','Single-line records');
+  showPage('overview');
+  byId('remove-dataset').click();
+  assert(!state.dataset&&!state.profile&&!state.lastRun,'Remove file resets active dataset');
+  assert(byId('workspace-content').classList.contains('hidden')&&!byId('welcome-upload').classList.contains('hidden'),'Remove file restores upload surface');
+  assert(!location.search.includes('dataset='),'Removed file URL cleared');
+  assert(!byId('review-page-content').querySelector('.rule-card'),'Previous check settings cleared');
   document.body.innerHTML='<pre id="smoke-result">PASS: 19-check catalog, add/delete, settings, reference upload, validation and report</pre>';
 })().catch(error=>{document.body.innerHTML='<pre id="smoke-result"></pre>';document.querySelector('pre').textContent='FAIL: '+error.stack;});
 """

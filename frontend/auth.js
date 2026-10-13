@@ -1,5 +1,5 @@
 (() => {
-const workspacePaths = ['/upload-file', '/choose-checks', '/results', '/file-details', '/history', '/available-checks'];
+const workspacePaths = Object.values(pagePaths);
 function returnPath() {
   const next = new URLSearchParams(location.search).get('next');
   if (!next) return '';
@@ -111,9 +111,11 @@ function setMode(next, updateUrl = true) {
 }
 window.setAuthMode = setMode;
 window.showLogin = () => { document.body.classList.add('auth-pending'); if (/^https?:$/.test(location.protocol)) history.replaceState({}, '', authUrl('login')); setMode('login', false); };
-function enter(user) { const next = returnPath(); if (next && /^https?:$/.test(location.protocol)) history.replaceState({}, '', next); document.getElementById('account-name').textContent = `${user.first_name} ${user.last_name}`; document.body.classList.remove('auth-pending'); form.reset(); initialize(); }
+function enter(user) { setWorkspaceUser(user); const next = returnPath(); if (next && /^https?:$/.test(location.protocol)) history.replaceState({}, '', next); document.getElementById('account-name').textContent = `${user.first_name} ${user.last_name}`; document.body.classList.remove('auth-pending'); form.reset(); initialize(); }
 async function request(path, data) {
-  const response = await fetch(`/api/auth/${path}`, data ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)} : {});
+  let response;
+  try { response = await fetch(`/api/auth/${path}`, data ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)} : {}); }
+  catch { throw new Error('Unable to connect. Check your connection and try again.'); }
   const result = await response.json();
   if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : (Array.isArray(result.detail) ? result.detail.map(item => item.msg.replace(/^Value error, /, '')).join(' ') : 'Please check your details and try again.'));
   return result;
@@ -131,7 +133,7 @@ form.onsubmit = async event => {
  catch (error) { message.textContent = error.message; }
  finally { submitting = false; submit.disabled = false; document.querySelectorAll('#switch-auth').forEach(b => b.disabled = false); }
 };
-document.getElementById('logout-button').onclick = async () => { try { await request('logout', {}); location.assign('/login'); } catch(error) { showNotice(error.message, 'error'); } };
+document.getElementById('logout-button').onclick = async () => { try { await request('logout', {}); location.assign('/login'); } catch(error) { toast('Could not sign out: ' + error.message, true); } };
 async function loadCountryCodes() {
   const countries = await request('countries');
   const displayNames = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['en'], {type:'region'}) : null;
@@ -151,6 +153,6 @@ async function loadCountryCodes() {
   validatePhone();
 }
 loadCountryCodes().catch(() => { message.textContent = 'Unable to load country codes. Please refresh the page to try again.'; });
-setMode(location.pathname === '/signup' ? 'signup' : 'login', false);
-request('me').then(result => { if (['/login', '/signup'].includes(location.pathname.replace(/\/$/, ''))) { setMode(location.pathname.replace(/\/$/, '') === '/signup' ? 'signup' : 'login', false); return; } enter(result.user); }).catch(error => { const signup = location.pathname === '/signup'; if (/^https?:$/.test(location.protocol)) history.replaceState({}, '', authUrl(signup ? 'signup' : 'login')); setMode(signup ? 'signup' : 'login', false); if (error.message !== 'Please log in to continue.') message.textContent = error.message; });
+setMode(location.pathname.replace(/\/$/, '') === '/signup' ? 'signup' : 'login', false);
+request('me').then(result => { if (['/login', '/signup'].includes(location.pathname.replace(/\/$/, ''))) { setMode(location.pathname.replace(/\/$/, '') === '/signup' ? 'signup' : 'login', false); return; } enter(result.user); }).catch(error => { const signup = location.pathname.replace(/\/$/, '') === '/signup'; if (/^https?:$/.test(location.protocol)) history.replaceState({}, '', authUrl(signup ? 'signup' : 'login')); setMode(signup ? 'signup' : 'login', false); if (error.message !== 'Please log in to continue.') message.textContent = error.message; });
 })();

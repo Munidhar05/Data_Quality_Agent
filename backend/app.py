@@ -19,6 +19,9 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 from backend.business_documents import extract_document, parse_batch
+from backend.business_offline import parse_offline_batch, EXTENDED_TYPES
+from backend.business_offline_execution import validate_extended
+from backend.business_conditions import TYPES as BUSINESS_CONDITION_TYPES, validate_condition
 from backend.auth import router as auth_router, current_user
 from backend.admin import router as admin_router, login_router as admin_login_router
 from backend.execution import PandasEngine
@@ -26,7 +29,7 @@ from backend.llm import metadata_for_llm, provider_from_environment, validate_ai
 from backend.profiler import profile_frame
 from backend.rules import OPERATORS, discover_rules, parse_business_requirement, recommend_rules
 from backend.scoring import calculate_score
-from backend.storage import LocalFileStorage, MAX_UPLOAD_BYTES, UPLOAD_DIR
+from backend.storage import LocalFileStorage, MAX_UPLOAD_BYTES, UPLOAD_DIR, ACTIVE_OWNER
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(APP_ROOT / ".env")
@@ -43,15 +46,20 @@ app.include_router(admin_login_router)
 app.include_router(admin_router)
 @app.middleware("http")
 async def require_login(request, call_next):
+    user = None
     if request.url.path.startswith("/api/") and not request.url.path.startswith(("/api/auth/", "/api/admin/")) and request.url.path != "/api/health":
-        if not current_user(request):
+        user = current_user(request)
+        if not user:
             return JSONResponse({"detail": "Please log in to continue."}, status_code=401)
     if request.url.path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
         if origin and origin.rstrip("/") != str(request.base_url).rstrip("/"):
             return JSONResponse({"detail": "Invalid request origin."}, status_code=403)
-    return await call_next(request)
-
+    token = ACTIVE_OWNER.set(str(user["id"]) if user else None)
+    try:
+        return await call_next(request)
+    finally:
+        ACTIVE_OWNER.reset(token)
 
 
 class BusinessRuleRequest(BaseModel):
@@ -60,6 +68,11 @@ class BusinessRuleRequest(BaseModel):
 
 class BusinessBatchRequest(BaseModel):
     text: str = Field(min_length=1, max_length=100000)
+
+
+class BusinessClarificationRequest(BaseModel):
+    requirement: str = Field(min_length=1, max_length=100000)
+    clarification: str = Field(min_length=1, max_length=100000)
 
 
 class SemanticRequest(BaseModel):
@@ -153,11 +166,12 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         metadata = storage.save_dataset(file.filename or "dataset.csv", content)
         frame = storage.load_dataset(metadata["dataset_id"])
         if frame.empty or len(frame.columns) == 0:
-            raise ValueError("The file contains no tabular records or columns. Upload a CSV or Parquet file with a header and at least one record.")
+            raise ValueError("The file contains no tabular records or columns. Upload a supported data file with column names and at least one record.")
         metadata = storage.dataset_metadata(metadata["dataset_id"], metadata["name"])
     except (ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     profile = _profile_with_overrides(metadata, frame)
+    storage.save_business_context(metadata["dataset_id"], metadata_for_llm(profile, []))
     recommendations, _ = _recommendations(frame, profile)
     return {"dataset": metadata, "profile": profile, "recommendations": recommendations, "warnings": []}
 
@@ -177,15 +191,24 @@ def get_rules() -> list[dict[str, Any]]:
 
 @app.post("/api/datasets/{dataset_id}/business-rules/parse")
 def parse_rule(dataset_id: str, body: BusinessRuleRequest) -> dict[str, Any]:
-    _, frame = _dataset_or_404(dataset_id)
-    return parse_business_requirement(body.requirement, [str(column) for column in frame.columns])
+    result = _business_batch(dataset_id, body.requirement)
+    if len(result["rules"]) == 1:
+        return result["rules"][0]
+    item = result["unresolved"][0] if result["unresolved"] else {}
+    return {**result, "status":"NOT_APPLIED", "clarification":item.get("reason", "No executable rule was identified.")}
 
 
 def _business_batch(dataset_id: str, text: str) -> dict[str, Any]:
     metadata, frame = _dataset_or_404(dataset_id)
-    profile = _profile_with_overrides(metadata, frame)
+    saved = metadata.get('business_context', {})
+    context = saved.get('metadata') if saved.get('version') == 1 else None
+    if not context or not context.get('retrieval_index'):
+        from backend.business_context import build_retrieval_index
+        context = context or metadata_for_llm(_profile_with_overrides(metadata, frame), [])
+        context = {**context, 'retrieval_index': build_retrieval_index(context)}
+        storage.save_business_context(dataset_id, context)
     try:
-        return parse_batch(text, [str(column) for column in frame.columns], metadata_for_llm(profile, []), llm_provider)
+        return parse_offline_batch(text, [str(column) for column in frame.columns], context)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -193,6 +216,18 @@ def _business_batch(dataset_id: str, text: str) -> dict[str, Any]:
 @app.post("/api/datasets/{dataset_id}/business-rules/batch")
 def parse_business_batch(dataset_id: str, body: BusinessBatchRequest) -> dict[str, Any]:
     return _business_batch(dataset_id, body.text)
+
+
+@app.post("/api/datasets/{dataset_id}/business-rules/clarify")
+def clarify_business_rule(dataset_id: str, body: BusinessClarificationRequest) -> dict[str, Any]:
+    from backend.business_context import clarify_requirement
+    metadata, frame = _dataset_or_404(dataset_id)
+    context = metadata.get('business_context', {}).get('metadata') or metadata_for_llm(_profile_with_overrides(metadata, frame), [])
+    rule = clarify_requirement(body.requirement, body.clarification, [str(column) for column in frame.columns], context)
+    if rule:
+        return {'rules':[rule], 'unresolved':[], 'mode':'local', 'message':'Clarification interpreted. Review the rule below.'}
+    # A complete rewritten rule is interpreted normally, using the same upload context.
+    return _business_batch(dataset_id, body.clarification)
 
 
 @app.post("/api/datasets/{dataset_id}/business-rules/document")
@@ -224,11 +259,16 @@ def save_semantic(dataset_id: str, body: SemanticRequest) -> dict[str, Any]:
     path = UPLOAD_DIR / f"{dataset_id}.json"
     path.write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
     profile = _profile_with_overrides(metadata, frame)
+    storage.save_business_context(dataset_id, metadata_for_llm(profile, []))
     recommendations, _ = _recommendations(frame, profile)
     return {"dataset": metadata, "profile": profile, "recommendations": recommendations}
 
 
 def _validate_business_rule(frame: pd.DataFrame, rule: dict[str, Any], ordinal: int) -> list[dict[str, Any]]:
+    if rule.get("type") in EXTENDED_TYPES:
+        return validate_extended(frame, rule, ordinal, _validate_business_rule)
+    if rule.get("type") in BUSINESS_CONDITION_TYPES:
+        return validate_condition(frame, rule, ordinal)
     rule_id = f"BUSINESS-{ordinal:03d}"
     left_name = rule.get("column") if rule.get("type") == "comparison" else rule.get("left")
     right_name = rule.get("right") if rule.get("type") == "cross_column" else None
@@ -299,26 +339,36 @@ def create_run(request: RunRequest) -> dict[str, Any]:
             failures.extend(rule_failures)
             check_results.append({"rule_id": rule["rule_id"], "name": rule["name"], "status": "FAIL" if rule_failures else "PASS", "failure_count": len(rule_failures)})
         for ordinal, business_rule in enumerate(request.business_rules, 1):
-            if business_rule.get("status") != "PARSED" or business_rule.get("type") not in {"comparison", "cross_column"}:
-                raise ValueError("Only reviewed, structured comparison business rules can run. Clarify ambiguous requirements first.")
+            if business_rule.get("status") != "PARSED" or business_rule.get("type") not in ({"comparison", "cross_column"} | BUSINESS_CONDITION_TYPES | EXTENDED_TYPES):
+                raise ValueError("Only reviewed, structured business rules can run. Clarify ambiguous requirements first.")
             business_failures = _validate_business_rule(frame, business_rule, ordinal)
             failures.extend(business_failures)
             check_results.append({"rule_id": f"BUSINESS-{ordinal:03d}", "name": "Business requirement", "status": "FAIL" if business_failures else "PASS", "failure_count": len(business_failures)})
-            selected.append({"rule_id": f"BUSINESS-{ordinal:03d}", "version": "1.0", "name": "Business requirement", "category": "consistency", "severity": "high", "configuration": business_rule, "predicate": "user_approved_comparison"})
+            selected.append({"rule_id": f"BUSINESS-{ordinal:03d}", "version": "1.0", "name": business_rule.get("source_rule_id") or "Business requirement", "category": str(business_rule.get("category", "consistency")).lower(), "severity": "high", "configuration": business_rule, "predicate": "user_approved_comparison"})
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
     by_row: dict[Any, list[dict[str, Any]]] = {}
     for failure in failures:
         by_row.setdefault(failure["row_index"], []).append(failure)
-    result = frame.copy()
+    result = storage.load_dataset(request.dataset_id, original=True)
+    metadata_columns = {}
+    occupied = set(result.columns)
+    for name in ("dq_status", "failed_rules", "failure_reasons", "run_id", "validated_at"):
+        candidate = name
+        suffix = 2
+        while candidate in occupied:
+            candidate = f"{name}_{suffix}"
+            suffix += 1
+        metadata_columns[name] = candidate
+        occupied.add(candidate)
     row_failures = [by_row.get(int(index) if isinstance(index, int) else str(index), []) for index in frame.index]
-    result["dq_status"] = ["REJECTED" if issues else "ACCEPTED" for issues in row_failures]
-    result["failed_rules"] = [[issue["rule_id"] for issue in issues] for issues in row_failures]
-    result["failure_reasons"] = [[issue["reason"] for issue in issues] for issues in row_failures]
-    result["run_id"] = uuid.uuid4().hex
-    result["validated_at"] = datetime.now(timezone.utc).isoformat()
-    rejected_mask = result["dq_status"] == "REJECTED"
+    result[metadata_columns["dq_status"]] = ["REJECTED" if issues else "ACCEPTED" for issues in row_failures]
+    result[metadata_columns["failed_rules"]] = [[issue["rule_id"] for issue in issues] for issues in row_failures]
+    result[metadata_columns["failure_reasons"]] = [[issue["reason"] for issue in issues] for issues in row_failures]
+    result[metadata_columns["run_id"]] = uuid.uuid4().hex
+    result[metadata_columns["validated_at"]] = datetime.now(timezone.utc).isoformat()
+    rejected_mask = result[metadata_columns["dq_status"]] == "REJECTED"
     accepted_frame, rejected_frame = result.loc[~rejected_mask].copy(), result.loc[rejected_mask].copy()
     score = calculate_score(selected, failures, len(frame))
     accepted_name = request.accepted_name or f"{metadata['name']}_accepted"
@@ -326,14 +376,15 @@ def create_run(request: RunRequest) -> dict[str, Any]:
     if len(accepted_name) > 100 or len(rejected_name) > 100:
         raise HTTPException(status_code=422, detail="Output names must be 100 characters or fewer.")
     run = {
-        "run_id": result["run_id"].iloc[0] if len(result) else uuid.uuid4().hex,
+        "run_id": result[metadata_columns["run_id"]].iloc[0] if len(result) else uuid.uuid4().hex,
         "dataset_id": request.dataset_id,
+        "output_metadata_columns": metadata_columns,
         "dataset_name": metadata["name"],
         "dataset_filename": metadata.get("filename", metadata["name"]),
         "dataset_profile": _profile_with_overrides(metadata, frame),
         "profile_version": "1.0",
         "engine_version": ENGINE_VERSION,
-        "validated_at": result["validated_at"].iloc[0] if len(result) else datetime.now(timezone.utc).isoformat(),
+        "validated_at": result[metadata_columns["validated_at"]].iloc[0] if len(result) else datetime.now(timezone.utc).isoformat(),
         "rules_considered": discover_rules(),
         "rules_selected": selected,
         "check_results": check_results,
@@ -380,7 +431,8 @@ def download_output(run_id: str, output: str) -> FileResponse:
 
 @app.get("/api/datasets/{dataset_id}/rows")
 def get_rows(dataset_id: str, offset: int = 0, limit: int = 50, search: str = "", sort_by: str = "", sort_direction: str = "asc") -> dict[str, Any]:
-    metadata, frame = _dataset_or_404(dataset_id)
+    metadata, typed_frame = _dataset_or_404(dataset_id)
+    frame = storage.load_dataset(dataset_id, original=True)
     if search:
         mask = frame.astype(str).apply(lambda column: column.str.contains(search, case=False, regex=False, na=False)).any(axis=1)
         frame = frame.loc[mask]
@@ -391,9 +443,10 @@ def get_rows(dataset_id: str, offset: int = 0, limit: int = 50, search: str = ""
         if sort_direction not in {"asc", "desc"}:
             raise HTTPException(status_code=422, detail="Sort direction must be asc or desc.")
         try:
-            frame = frame.sort_values(sort_by, ascending=sort_direction == "asc", na_position="last", kind="stable")
+            order = typed_frame.loc[frame.index, sort_by].sort_values(ascending=sort_direction == "asc", na_position="last", kind="stable").index
         except TypeError:
-            frame = frame.assign(**{sort_by: frame[sort_by].astype(str)}).sort_values(sort_by, ascending=sort_direction == "asc", kind="stable")
+            order = frame[sort_by].astype(str).sort_values(ascending=sort_direction == "asc", kind="stable").index
+        frame = frame.loc[order]
     limit = max(1, min(limit, 100))
     frame = frame.iloc[max(offset, 0):max(offset, 0) + limit]
     safe_frame = json.loads(frame.to_json(orient="records", date_format="iso", default_handler=str))

@@ -9,9 +9,17 @@ COUNTRIES = json.loads((Path(__file__).resolve().parents[1] / "frontend" / "coun
 COUNTRY_CODES = {country["code"] for country in COUNTRIES}
 EMAIL_PATTERN = r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}"
 
+class AccountConnection(sqlite3.Connection):
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 def connect():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(DB_PATH)
+    db = sqlite3.connect(DB_PATH, factory=AccountConnection)
     db.row_factory = sqlite3.Row
     db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, first_name TEXT, last_name TEXT, company TEXT, phone TEXT, email TEXT UNIQUE, salt TEXT, password_hash TEXT)")
     db.execute("CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER, expires REAL)")

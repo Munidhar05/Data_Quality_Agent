@@ -142,7 +142,7 @@ def test_api_requires_approval_and_writes_dynamic_accepted_rejected_outputs(tmp_
     assert rows["rows"][0]["artifact"] == "R3"
 
     ambiguous = client.post(f"/api/datasets/{dataset_id}/business-rules/parse", json={"requirement": "reading should be valid"})
-    assert ambiguous.json()["status"] == "REQUIRES_USER_INPUT"
+    assert ambiguous.json()["status"] == "NOT_APPLIED"
     parsed = client.post(f"/api/datasets/{dataset_id}/business-rules/parse", json={"requirement": "reading must be greater than zero"}).json()
     assert parsed["status"] == "PARSED"
 

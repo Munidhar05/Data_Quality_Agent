@@ -5,15 +5,16 @@ from backend import auth
 ACCOUNT = {"first_name":"Jane","last_name":"Doe","company":"Feuji","country_code":"+91","country_region":"IN","phone":"9876543210","email":"Jane@example.com","password":"my-password123"}
 
 
-def test_admin_permissions_and_lifecycle():
+def test_admin_permissions_and_lifecycle(monkeypatch):
+    monkeypatch.setenv("DQ_ADMIN_PASSWORD", "test-admin-secret")
     with TestClient(app) as admin, TestClient(app) as user:
         assert admin.get("/admin").status_code == 200
         for path in ("/users","/logs","/me"):
             assert admin.get("/api/admin"+path).status_code == 401
         assert admin.post("/api/admin/users",json=ACCOUNT).status_code == 401
         assert admin.post("/api/admin/login",json={"password":"wrong"}).status_code == 401
-        assert admin.post("/api/admin/login",json={"password":"admin"},headers={"Origin":"https://elsewhere.example"}).status_code == 403
-        response=admin.post("/api/admin/login",json={"password":"admin"})
+        assert admin.post("/api/admin/login",json={"password":"test-admin-secret"},headers={"Origin":"https://elsewhere.example"}).status_code == 403
+        response=admin.post("/api/admin/login",json={"password":"test-admin-secret"})
         assert response.status_code == 200
         assert "httponly" in response.headers["set-cookie"].lower()
         assert admin.post("/api/admin/users",json=ACCOUNT).status_code == 201
@@ -46,9 +47,10 @@ def test_admin_permissions_and_lifecycle():
         assert admin.get("/api/admin/logs").status_code==401
 
 
-def test_admin_edit_validation_and_expiry():
+def test_admin_edit_validation_and_expiry(monkeypatch):
+    monkeypatch.setenv("DQ_ADMIN_PASSWORD", "test-admin-secret")
     with TestClient(app) as client:
-        client.post("/api/admin/login",json={"password":"admin"})
+        client.post("/api/admin/login",json={"password":"test-admin-secret"})
         client.post("/api/admin/users",json=ACCOUNT)
         uid=client.get("/api/admin/users").json()[0]["id"]
         assert client.put(f"/api/admin/users/{uid}",json={**ACCOUNT,"phone":"letters"}).status_code==400

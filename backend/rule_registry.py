@@ -46,17 +46,18 @@ class RuleRegistry:
 
     def discover(self) -> list[dict[str, Any]]:
         definitions = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
-        self._plugins = {}
+        plugins_by_id = {}
         for plugin in self._discover_plugins():
             rule = plugin.get_metadata()
             if not rule.get("rule_id") or not rule.get("predicate"):
                 raise ValueError("Each rule plugin must declare a rule_id and predicate in its metadata.")
             if any(item["rule_id"] == rule["rule_id"] for item in definitions):
                 raise ValueError(f"Rule ID {rule['rule_id']} is already defined in the rule registry.")
-            if rule["rule_id"] in self._plugins:
+            if rule["rule_id"] in plugins_by_id:
                 raise ValueError(f"Rule plugin ID {rule['rule_id']} is registered more than once.")
-            self._plugins[rule["rule_id"]] = plugin
+            plugins_by_id[rule["rule_id"]] = plugin
             definitions.append(rule)
+        self._plugins = plugins_by_id
         return definitions
 
     def plugin_for(self, rule_id: str) -> RulePlugin | None:

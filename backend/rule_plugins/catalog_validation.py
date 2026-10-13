@@ -84,6 +84,7 @@ def _aggregate(s, op):
     return getattr(x, op)()
 
 def _bounds(v, p):
+    p = {key: value for key, value in p.items() if value is not None}
     if 'minimum' not in p and 'maximum' not in p:
         raise ValueError('Provide a minimum or maximum.')
     if 'minimum' in p and 'maximum' in p and (float(p['minimum']) > float(p['maximum'])):
@@ -284,7 +285,8 @@ class CatalogRule:
     def validate(self,data,configuration):
         p=configuration.get('parameters', {} if self.number == 5 else None)
         if not isinstance(p,dict):raise ValueError(f'{self.check["name"]}: supply a JSON parameters object.')
-        if set(EXAMPLES[self.number])-set(p):raise ValueError('Missing parameters: '+', '.join(sorted(set(EXAMPLES[self.number])-set(p))))
+        required = set(EXAMPLES[self.number]) - ({'minimum', 'maximum'} if self.number == 7 else set())
+        if required - set(p):raise ValueError('Missing parameters: '+', '.join(sorted(required-set(p))))
         try:mask=evaluate(self.number,data,p).fillna(True).astype(bool)
         except (KeyError,TypeError,OverflowError,re.error) as error:raise ValueError(f'{self.check["name"]}: invalid configuration ({error}).') from error
         rule=self.get_metadata();failures=[]

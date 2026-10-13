@@ -96,17 +96,20 @@ def validate_ai_recommendations(response: dict[str, Any], profile: dict[str, Any
     known_columns = {column["name"] for column in profile.get("columns", [])}
     valid_statuses = {"RECOMMENDED", "OPTIONAL", "NOT_APPLICABLE", "REQUIRES_USER_INPUT", "CANNOT_EVALUATE"}
     validated = {}
-    for item in response.get("recommendations", []):
-        if not isinstance(item, dict) or item.get("rule_id") not in known_rules:
+    items = response.get("recommendations", [])
+    if not isinstance(items, list):
+        return validated
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("rule_id"), str) or item["rule_id"] not in known_rules:
             continue
-        if item.get("applicability") not in valid_statuses:
+        if not isinstance(item.get("applicability"), str) or item["applicability"] not in valid_statuses:
             continue
         confidence = item.get("confidence")
-        if not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
             continue
         columns = item.get("columns")
         evidence = item.get("evidence")
-        if not isinstance(columns, list) or any(column not in known_columns for column in columns):
+        if not isinstance(columns, list) or any(not isinstance(column, str) or column not in known_columns for column in columns):
             continue
         if not isinstance(evidence, list) or not isinstance(item.get("reason"), str):
             continue
