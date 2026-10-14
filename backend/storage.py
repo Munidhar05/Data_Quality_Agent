@@ -31,7 +31,7 @@ class DatasetStorage(Protocol):
 
     def dataset_metadata(self, dataset_id: str, name: str | None = None) -> dict[str, Any]: ...
 
-    def save_run(self, run: dict[str, Any], accepted: pd.DataFrame, rejected: pd.DataFrame) -> None: ...
+    def save_run(self, run: dict[str, Any], accepted: pd.DataFrame, rejected: pd.DataFrame, failures: list[dict[str, Any]] | None = None) -> None: ...
 
 
 class LocalFileStorage(DatasetStorage):
@@ -123,12 +123,14 @@ class LocalFileStorage(DatasetStorage):
         path.write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
         return metadata
 
-    def save_run(self, run: dict[str, Any], accepted: pd.DataFrame, rejected: pd.DataFrame) -> None:
+    def save_run(self, run: dict[str, Any], accepted: pd.DataFrame, rejected: pd.DataFrame, failures: list[dict[str, Any]] | None = None) -> None:
         run.setdefault("owner_id", ACTIVE_OWNER.get())
         authorize(run)
         run_id = run["run_id"]
         accepted.to_csv(RUN_DIR / f"{run_id}_accepted.csv", index=False)
         rejected.to_csv(RUN_DIR / f"{run_id}_rejected.csv", index=False)
+        if failures is not None:
+            self.save_error_output(run_id, failures)
         (RUN_DIR / f"{run_id}.json").write_text(json.dumps(run, ensure_ascii=False, default=str, indent=2), encoding="utf-8")
 
     def list_runs(self) -> list[dict[str, Any]]:
@@ -153,11 +155,40 @@ class LocalFileStorage(DatasetStorage):
         authorize(run)
         return run
 
+    def save_error_output(self, run_id: str, failures: list[dict[str, Any]]) -> None:
+        columns = ["Status", "Rule / row", "Column", "Reason", "Observed value"]
+        rows = []
+        for failure in failures:
+            row = "Entire dataset" if failure.get("row_index") == "DATASET" else f"Row {failure.get('row_index', '')}"
+            value = failure.get("actual_value")
+            observed = "Missing" if value is None else "(empty)" if value == "" else str(value)
+            rows.append({
+                "Status": failure.get("status", ""),
+                "Rule / row": f"{failure.get('rule_name', '')}\n{row}",
+                "Column": failure.get("column") or "Complete row",
+                "Reason": f"{failure.get('reason', '')}\n{failure.get('expected_condition', '')}".rstrip("\n"),
+                "Observed value": observed,
+            })
+        pd.DataFrame(rows, columns=columns).to_csv(RUN_DIR / f"{run_id}_errors.csv", index=False, encoding="utf-8-sig")
+
     def output_path(self, run_id: str, output: str) -> Path:
-        if output not in {"accepted", "rejected"}:
-            raise FileNotFoundError("Choose either the accepted or rejected output.")
+        if output not in {"accepted", "rejected", "errors"}:
+            raise FileNotFoundError("Choose accepted, rejected, or errors output.")
         run = self.get_run(run_id)
         path = RUN_DIR / f"{run_id}_{output}.csv"
+        if path.exists() and output == "errors":
+            headers = pd.read_csv(path, nrows=0).columns
+            if "actual_value" in headers:
+                # Preserve the full file for older runs whose on-screen audit was capped.
+                failures = run.get("failures", [])
+                if run.get("failure_count", len(failures)) > len(failures):
+                    failures = pd.read_csv(path, dtype=str, keep_default_na=False).to_dict("records")
+                self.save_error_output(run_id, failures)
+        if not path.exists() and output == "errors":
+            failures = run.get("failures", [])
+            if run.get("failure_count", len(failures)) > len(failures):
+                raise FileNotFoundError("Full error details are unavailable for this older run. Run validation again to download all errors.")
+            self.save_error_output(run_id, failures)
         if not path.exists():
             raise FileNotFoundError("The requested output file is unavailable.")
         return path

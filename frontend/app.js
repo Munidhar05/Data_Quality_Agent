@@ -725,6 +725,25 @@ function renderReview() {
 }
 
 function bindBusinessRuleRemoval() {
+  byId('business-rule-list').querySelectorAll('.edit-business-rule').forEach(button => button.addEventListener('click', () => {
+    if (agentBusy || businessBusy) return;
+    const item = button.closest('.business-rule-item');
+    const form = item.querySelector('.business-rule-editor');
+    form.hidden = false;
+    button.hidden = true;
+    form.querySelector('textarea').focus();
+  }));
+  byId('business-rule-list').querySelectorAll('.cancel-business-edit').forEach(button => button.addEventListener('click', () => {
+    if (agentBusy || businessBusy) return;
+    const item = button.closest('.business-rule-item');
+    const form = item.querySelector('.business-rule-editor');
+    form.hidden = true;
+    form.querySelector('textarea').value = state.businessRules[Number(form.dataset.index)].original_requirement;
+    form.querySelector('[role="alert"]').textContent = '';
+    item.querySelector('.edit-business-rule').hidden = false;
+    item.querySelector('.edit-business-rule').focus();
+  }));
+  byId('business-rule-list').querySelectorAll('.business-rule-editor').forEach(form => form.addEventListener('submit', saveBusinessRuleEdit));
   byId('business-rule-list').querySelectorAll('.remove-business-rule').forEach(button => button.addEventListener('click', () => {
     if (agentBusy || businessBusy) return;
     state.businessRules.splice(Number(button.dataset.index), 1);
@@ -924,7 +943,34 @@ function renderPluginConfig(rule) {
 }
 
 function renderBusinessRules() {
-  return state.businessRules.map((rule, index) => `<div class="business-rule-item"><strong>${escapeHtml(rule.original_requirement)}</strong><br><span>${escapeHtml(formatBusinessRule(rule))}</span>${rule.mapping_reason ? `<small class="business-mapping-reason">${escapeHtml(rule.mapping_reason)}</small>` : ''}<button type="button" class="remove-business-rule icon-button" data-index="${index}" aria-label="Delete business rule" title="Remove business rule">${deleteIcon}</button></div>`).join('');
+  return state.businessRules.map((rule, index) => `<div class="business-rule-item"><strong>${escapeHtml(rule.original_requirement)}</strong><br><span>${escapeHtml(formatBusinessRule(rule))}</span>${rule.mapping_reason ? `<small class="business-mapping-reason">${escapeHtml(rule.mapping_reason)}</small>` : ''}<div class="business-rule-actions"><button type="button" class="edit-business-rule" data-index="${index}" aria-label="Edit business rule" title="Edit business rule"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6L16 3Zm-2 2 5 5"/></svg></button><button type="button" class="remove-business-rule icon-button" data-index="${index}" aria-label="Delete business rule" title="Remove business rule">${deleteIcon}</button></div><form class="business-rule-editor" data-index="${index}" hidden><label>Rule condition<textarea required maxlength="100000" rows="3">${escapeHtml(rule.original_requirement)}</textarea></label><p role="alert"></p><div class="business-edit-buttons"><button type="submit" class="button button-primary">Save changes</button><button type="button" class="button button-quiet cancel-business-edit">Cancel</button></div></form></div>`).join('');
+}
+
+async function saveBusinessRuleEdit(event) {
+  event.preventDefault();
+  if (agentBusy || businessBusy) return;
+  const form = event.currentTarget;
+  const text = form.querySelector('textarea').value.trim();
+  const error = form.querySelector('[role="alert"]');
+  if (!text) { error.textContent = 'Enter a rule condition.'; return; }
+  const index = Number(form.dataset.index);
+  setBusinessBusy(true);
+  error.textContent = '';
+  try {
+    const result = await api(`/api/datasets/${encodeURIComponent(state.dataset.dataset_id)}/business-rules/batch`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})});
+    if (result.rules?.length !== 1 || result.unresolved?.length) {
+      error.textContent = result.unresolved?.[0]?.reason || 'Enter one supported rule condition. Your original rule is unchanged.';
+      return;
+    }
+    state.businessRules[index] = result.rules[0];
+    saveReviewDraft();
+    byId('business-rule-list').innerHTML = renderBusinessRules();
+    bindBusinessRuleRemoval();
+    const edited = byId('business-rule-list').querySelectorAll('.edit-business-rule')[index];
+    edited?.focus();
+    toast('Rule updated. Review its interpretation before running validation.');
+  } catch (failure) { error.textContent = failure.message; }
+  finally { setBusinessBusy(false); }
 }
 
 function formatBusinessRule(rule) {
@@ -1100,6 +1146,7 @@ function validateCheckSettings() {
 
 async function runValidation(event) {
   if (agentBusy || businessBusy) return;
+  if (document.querySelector('.business-rule-editor:not([hidden])')) { toast('Save or cancel your rule edit before running validation.', true); return; }
   if (state.businessDocumentFailure) { renderBusinessDocumentFailure(); toast('The business document was not added. Retry or exclude it before validation.', true); return; }
   if (byId('business-input')?.value.trim()) {
     await generateBusinessRules();
@@ -1258,7 +1305,7 @@ function renderResults(run) {
       <p class="dq-report-footnote">Severity counts individual issues. Failed records are distinct within each check; a record can fail multiple checks. Dataset-level issues have no record index. Run: ${escapeHtml(run.run_id)}</p>
     </article>
     <section class="results-download-card"><h2>Download files</h2><p>Download records that passed validation or need corrections.</p><div class="results-file-downloads"><label>Accepted file name<input id="accepted-name" maxlength="100" value="${escapeHtml(outputNames.accepted || run.dataset_name + '_accepted')}"></label><button class="button button-quiet" type="button" data-download-records="accepted">Download accepted records</button><label>Rejected file name<input id="rejected-name" maxlength="100" value="${escapeHtml(outputNames.rejected || run.dataset_name + '_rejected')}"></label><button class="button button-quiet" type="button" data-download-records="rejected">Download rejected records</button></div></section>
-    <details class="dq-audit-details"><summary>View rejected-record details (${numberFormat(run.failure_count)} issues)</summary><div class="report-controls"><label for="failure-filter">Search rejected-record issues</label><input class="explorer-search" id="failure-filter" placeholder="Filter failures by rule, column, or reason"></div><div id="failure-list" class="failure-list"></div></details>`;
+    <details class="dq-audit-details"><summary>View rejected-record details (${numberFormat(run.failure_count)} issues)</summary><div class="report-controls"><label for="failure-filter">Search rejected-record issues</label><input class="explorer-search" id="failure-filter" placeholder="Filter failures by rule, column, or reason"><button type="button" class="button button-quiet" id="download-errors" aria-label="Download errors as PDF" title="Download errors as PDF"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg></button></div><div id="failure-list" class="failure-list"></div></details>`;
   byId('results-page-content').querySelectorAll('[data-report-format]').forEach(button => button.addEventListener('click', () => downloadQualityReport(button.dataset.reportFormat)));
   byId('results-page-content').querySelectorAll('[data-download-records]').forEach(button => button.addEventListener('click', () => downloadRecordFile(button.dataset.downloadRecords)));
   ['accepted', 'rejected'].forEach(output => {
@@ -1267,6 +1314,7 @@ function renderResults(run) {
       try { sessionStorage.setItem(nameKey, JSON.stringify(state.downloadNames[run.run_id])); } catch {}
     };
   });
+  byId('download-errors').addEventListener('click', downloadErrorDetails);
   renderFailures(run.failures || []);
   byId('failure-filter').addEventListener('input', event => renderFailures(run.failures || [], event.target.value, 0));
 }
@@ -1332,3 +1380,21 @@ document.addEventListener('click', (event) => {
   }
 });
 compactNavigation.addEventListener('change', () => setNavigationOpen(false));
+
+async function downloadErrorDetails() {
+  const button = byId('download-errors');
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    const run = state.lastRun;
+    const response = await fetch(`/api/runs/${encodeURIComponent(run.run_id)}/errors.pdf`);
+    if (response.status === 401 && window.showLogin) window.showLogin();
+    if (!response.ok) {
+      let message = 'Could not download errors. Try again.';
+      try { const body = await response.json(); message = body.detail || message; } catch {}
+      throw new Error(message);
+    }
+    saveDownload(await response.blob(), `${run.dataset_name || 'validation'}_errors.pdf`);
+  } catch (error) { toast(error.message, true); }
+  finally { button.disabled = false; }
+}

@@ -40,7 +40,7 @@ def test_accounts_cannot_read_change_validate_or_reference_each_others_files(iso
     run = response.json()["run_id"]
     assert first.get("/api/runs").json()[0]["dataset_filename"] == "Audit File.csv"
     assert second.get("/api/runs").json() == []
-    for path in (f"/api/datasets/{dataset}/profile", f"/api/datasets/{dataset}/rows", f"/api/runs/{run}", f"/api/runs/{run}/download/accepted", f"/api/runs/{run}/download/rejected"):
+    for path in (f"/api/datasets/{dataset}/profile", f"/api/datasets/{dataset}/rows", f"/api/runs/{run}", f"/api/runs/{run}/download/accepted", f"/api/runs/{run}/download/rejected", f"/api/runs/{run}/download/errors"):
         assert second.get(path).status_code == 404, path
         assert first.get(path).status_code == 200, path
     assert second.post(f"/api/datasets/{dataset}/semantics", json={"column": "id", "semantic_type": "IDENTIFIER"}).status_code == 404

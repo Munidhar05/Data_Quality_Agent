@@ -170,6 +170,21 @@ def test_api_requires_approval_and_writes_dynamic_accepted_rejected_outputs(tmp_
     download = client.get(f"/api/runs/{run['run_id']}/download/rejected")
     assert download.status_code == 200
     assert "arbitrary_export_rejected.csv" in download.headers["content-disposition"]
+    errors_download = client.get(f"/api/runs/{run['run_id']}/download/errors")
+    assert errors_download.status_code == 200
+    errors = pd.read_csv(io.StringIO(errors_download.text), keep_default_na=False)
+    assert len(errors) == run["failure_count"]
+    assert list(errors.columns) == ["Status", "Rule / row", "Column", "Reason", "Observed value"]
+    assert "arbitrary_export_errors.csv" in errors_download.headers["content-disposition"]
+    pdf_download = client.get(f"/api/runs/{run['run_id']}/errors.pdf")
+    assert pdf_download.status_code == 200
+    assert pdf_download.headers["content-type"] == "application/pdf"
+    from pypdf import PdfReader
+    pdf = PdfReader(io.BytesIO(pdf_download.content))
+    text = "\n".join(page.extract_text() for page in pdf.pages)
+    assert "REASON" in text and "OBSERVED VALUE" in text and "Business requirement" in text
+
+
 
 
 def test_api_accepts_parquet_without_schema_assumptions(tmp_path, monkeypatch) -> None:

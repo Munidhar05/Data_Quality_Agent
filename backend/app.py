@@ -13,7 +13,7 @@ if __name__ == "__main__" and not __package__:
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -401,7 +401,7 @@ def create_run(request: RunRequest) -> dict[str, Any]:
         "outputs": {"accepted": accepted_name, "rejected": rejected_name},
         "warnings": ["Failure detail is capped at 5,000 entries in the audit report; accepted/rejected outputs include per-record failure reasons."] if len(failures) > 5000 else [],
     }
-    storage.save_run(run, accepted_frame, rejected_frame)
+    storage.save_run(run, accepted_frame, rejected_frame, failures=failures)
     return run
 
 
@@ -418,6 +418,21 @@ def get_run(run_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
 
+@app.get("/api/runs/{run_id}/errors.pdf")
+def download_errors_pdf(run_id: str) -> Response:
+    from backend.error_pdf import error_details_pdf
+    from urllib.parse import quote
+    try:
+        run = storage.get_run(run_id)
+        path = storage.output_path(run_id, "errors")
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    name = run.get("dataset_filename") or run["dataset_name"]
+    pdf = error_details_pdf(path, name)
+    filename = quote(f"{run['dataset_name']}_errors.pdf", safe="")
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"})
+
+
 @app.get("/api/runs/{run_id}/download/{output}")
 def download_output(run_id: str, output: str) -> FileResponse:
     try:
@@ -425,7 +440,7 @@ def download_output(run_id: str, output: str) -> FileResponse:
         path = storage.output_path(run_id, output)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    filename = f"{run['outputs'][output]}.csv"
+    filename = f"{run['outputs'].get(output, run['dataset_name'] + '_errors')}.csv"
     return FileResponse(path, media_type="text/csv", filename=filename)
 
 

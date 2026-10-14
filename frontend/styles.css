@@ -946,3 +946,20 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #6b4e3c; pa
  .step-navigation-buttons .button, .step-navigation-buttons .button-primary { flex:1 1 0; min-width:0; padding:10px 12px; }
  .profile-page-content, .review-layout, .registry-list, .history-content, .results-content { padding-bottom:0; }
 }
+
+/* Inline business-rule editing. */
+#business-page-content .business-rule-item { padding-right:112px; }
+.business-rule-actions { position:absolute; top:8px; right:8px; display:flex; align-items:center; justify-content:flex-end; gap:4px; margin:0; }
+.business-rule-item .business-rule-actions button { position:static; display:inline-flex; align-items:center; justify-content:center; margin:0; min-width:44px; min-height:44px; padding:8px 12px; }
+.business-rule-item .edit-business-rule { border:0; border-radius:6px; background:transparent; color:var(--orange-dark); }
+.business-rule-item .edit-business-rule:hover { background:var(--orange-soft); }
+.business-rule-editor[hidden], .business-rule-actions button[hidden] { display:none!important; }
+.business-rule-editor { margin-right:-96px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+.business-rule-editor label { display:flex; flex-direction:column; gap:8px; font-size:13px; }
+.business-rule-editor textarea { width:100%; min-height:90px; padding:12px; border:1px solid var(--line); border-radius:8px; resize:vertical; background:white; font:inherit; font-size:16px; }
+.business-rule-editor [role="alert"] { margin:8px 0; color:var(--red); font-size:13px; }
+.business-edit-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.business-rule-item .business-edit-buttons .button { display:inline-flex; margin:0; padding:10px 16px; font-size:14px; }
+
+.business-rule-item .business-edit-buttons .button-primary { color:#292524; }
+.business-rule-item .business-edit-buttons .button-quiet { color:#655044; }
