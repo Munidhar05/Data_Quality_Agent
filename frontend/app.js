@@ -648,6 +648,7 @@ function categorizedCheckPicker(selected) {
   const rules = executableChecks();
   const selectedIds = new Set(selected.map(rule => rule.rule_id));
   return checkCatalog.map(group => `<details class="picker-category"><summary>${escapeHtml(group.name)} <span>${group.checks.length}</span></summary><div>${group.checks.map(check => {
+    if (check.number === 19) return `<button type="button" class="catalog-subcheck" data-open-business-rules title="${escapeHtml(check.description)}"><span>+ ${escapeHtml(check.name)}</span><small>Open Business Rules</small></button>`;
     const rule = rules.find(item => item.catalog_number === check.number) || (check.number === 5 ? rules.find(item => item.predicate === 'unique_rows') : null);
     const chosen = rule && (selectedIds.has(rule.rule_id) || (check.number === 5 && selected.some(item => item.predicate === 'unique_rows')));
     return `<button type="button" class="catalog-subcheck ${rule ? 'add-optional-check' : ''}" ${rule ? `data-rule-id="${escapeHtml(rule.rule_id)}"` : ''} ${!rule || chosen ? 'disabled' : ''} title="${escapeHtml(check.description)}"><span>${chosen ? '&#10003;' : rule ? '+' : '&#8212;'} ${escapeHtml(check.name)}</span><small>${chosen ? 'Already included' : rule ? 'Configure & add' : 'Not supported by the current engine'}</small></button>`;
@@ -689,7 +690,7 @@ function renderReview() {
   target.onchange = event => { if (event.target.matches('.reference-file-input')) { uploadReferenceFile(event.target); return; } syncSuggestedParameters(event.target); saveReviewDraft(); updateApprovalCount(); };
   target.onclick = event => {
     if (agentBusy || businessBusy) return;
-    if (event.target.closest('[data-step-business]')) { showPage('business'); return; }
+    if (event.target.closest('[data-step-business], [data-open-business-rules]')) { saveReviewDraft(); showPage('business'); byId('business-input')?.focus({ preventScroll: true }); return; }
     if (event.target.closest('[data-step-previous]')) { showPage('overview'); return; }
     const bulk = event.target.closest('[data-column-action]');
     if (bulk) {
@@ -1287,7 +1288,6 @@ async function initialize() {
   try {
     const [health, rules] = await Promise.all([api('/api/health'), api('/api/rules')]);
     state.rules = rules;
-    byId('footer-engine').textContent = `ENGINE ${health.engine_version}`;
     const aiEnabled = health.llm?.configured === true;
     const aiDot = byId('ai-status-dot');
     aiDot.classList.toggle('ai-enabled', aiEnabled);
@@ -1301,3 +1301,34 @@ async function initialize() {
 
 
 agentProgress(0, 'Ready for your file', 'Upload a supported data file. The agent will guide you through each step.');
+
+// Mobile navigation is a disclosure; normal page links keep their existing behavior.
+const navigationToggle = byId('navigation-toggle');
+const navigationRail = document.querySelector('.rail');
+const compactNavigation = window.matchMedia('(max-width: 900px)');
+function setNavigationOpen(open, restoreFocus = false) {
+  navigationRail.classList.toggle('navigation-open', open);
+  navigationToggle.setAttribute('aria-expanded', String(open));
+  navigationToggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+  if (restoreFocus) navigationToggle.focus();
+}
+navigationToggle.addEventListener('click', () => {
+  setNavigationOpen(navigationToggle.getAttribute('aria-expanded') !== 'true');
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && navigationToggle.getAttribute('aria-expanded') === 'true') {
+    setNavigationOpen(false, true);
+  }
+});
+document.addEventListener('click', (event) => {
+  if (!compactNavigation.matches || navigationToggle.getAttribute('aria-expanded') !== 'true') return;
+  const link = event.target.closest('[data-page]');
+  if (link && !link.disabled) {
+    setNavigationOpen(false);
+    const heading = document.querySelector('.page.active h1');
+    if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({preventScroll:true}); }
+  } else if (!navigationRail.contains(event.target)) {
+    setNavigationOpen(false);
+  }
+});
+compactNavigation.addEventListener('change', () => setNavigationOpen(false));

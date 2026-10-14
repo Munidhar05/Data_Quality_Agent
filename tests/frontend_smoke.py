@@ -41,6 +41,13 @@ TESTS = r"""
   showPage('review');
   assert(document.querySelector('.rule-card[data-rule-id="DQ-CATALOG-014"] .status-chip').textContent==='Ready','Ready badge survives restoring draft');
   document.querySelector('.rule-card[data-rule-id="DQ-CATALOG-014"] .delete-test').click();
+  const businessEntry=document.querySelector('[data-open-business-rules]');
+  assert(businessEntry&&!businessEntry.disabled,'Business validation opens shared section');
+  const checksBefore=state.reviewDraft.cards.length;
+  businessEntry.click();
+  assert(byId('page-business').classList.contains('active'),'Catalog business validation routes to Business Rules');
+  assert(state.reviewDraft.cards.length===checksBefore&&!document.querySelector('.rule-card[data-rule-id="DQ-CATALOG-019"]'),'No duplicate business configuration added');
+  showPage('review');
   document.querySelector('[data-rule-id="DQ-CATALOG-003"].add-optional-check').click();
   assert(byId('selected-checks').firstElementChild.dataset.ruleId==='DQ-CATALOG-003','New check appears first');
   saveReviewDraft();renderReview();

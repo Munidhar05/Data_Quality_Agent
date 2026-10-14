@@ -14,3 +14,43 @@ aside .workspace-link { white-space: nowrap; gap: 8px; padding: 12px 10px; }
 th .column-sort { display: inline-flex; align-items: center; gap: 8px; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-transform: inherit; font-weight: inherit; border-radius: 3px; }
 .sort-arrow { color: #9c8a7d; font-size: 15px; }
 th[aria-sort="ascending"] .sort-arrow, th[aria-sort="descending"] .sort-arrow, .column-sort:hover { color: #db5c16; }
+
+:is(h1,h2,h3,h4,h5,h6):focus{outline:none}
+:is(button,a,input,select,textarea,summary):focus-visible{outline:2px solid #f37024;outline-offset:3px}
+
+/* Phone and tablet administration layout. */
+@media screen and (max-width:800px) {
+ #admin-workspace > aside { gap:12px; padding:16px; }
+ aside nav { flex:1 1 100%; order:3; gap:8px; }
+ aside nav button { flex:1; min-height:44px; text-align:center; }
+ aside .workspace-link { display:flex; max-width:100%; white-space:normal; font-size:12px; }
+ #admin-workspace main { min-width:0; }
+ header { gap:12px; font-size:13px; }
+ header > span { min-width:0; }
+ header button { flex-shrink:0; min-height:44px; }
+ .content { padding:20px 16px; }
+ .heading { flex-wrap:wrap; gap:12px; }
+ .heading > div { min-width:0; }
+ .heading > button { width:100%; min-height:44px; }
+ .toolbar { flex-wrap:wrap; }
+ .toolbar input { flex:1 1 220px; min-width:0; max-width:none; }
+ .toolbar button { min-height:44px; }
+ .table-scroll { max-width:100%; overscroll-behavior-x:contain; }
+ input, select { font-size:16px; min-height:44px; }
+}
+@media screen and (max-width:480px) {
+ .login { padding:16px; min-height:100svh; }
+ .login-card { padding:24px 20px; }
+ h1 { font-size:26px; overflow-wrap:anywhere; }
+ aside > img { width:80px; }
+ aside .workspace-link { flex:1; }
+ .metrics { grid-template-columns:1fr; gap:10px; margin:20px 0; }
+ .metrics article { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px; }
+ .metrics strong { margin:0; }
+ .form-grid { grid-template-columns:minmax(0,1fr); }
+ dialog { padding:20px 16px; max-height:calc(100dvh - 32px); }
+ .dialog-heading { gap:10px; }
+ .dialog-heading h2 { font-size:22px; }
+ .dialog-actions { flex-wrap:wrap; }
+ .dialog-actions button { flex:1; min-height:44px; }
+}
