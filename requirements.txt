@@ -16,3 +16,5 @@ defusedxml>=0.7,<1
 fastavro>=1.9,<2
 
 reportlab>=4.4,<5
+
+google-genai>=1,<3

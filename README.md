@@ -40,9 +40,19 @@ To add a Python rule, create a module in `backend/rule_plugins/` and expose a `R
 
 Rules in `backend/rule_registry.json` use built-in deterministic predicates and can be configured without a Python plug-in. Never rely on an AI response as executable rule logic.
 
-## Optional AI Advice
+## AI recommendations with local fallback
 
 The app runs without an LLM credential. In that mode no profile leaves the process; recommendations come from deterministic profiling evidence.
+
+To use Gemini, add the following to your local `.env` (which is ignored by Git), then restart the server:
+
+```dotenv
+DQ_LLM_PROVIDER=gemini
+GEMINI_API_KEY=replace-with-your-key
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+Valid AI responses supply applicability, confidence, candidate columns, reasons and evidence. Each recommendation has a `recommendation_source` of `AI` or `RULE_BASED`. Missing or invalid entries fall back individually to Python rules; timeout, authentication, quota or provider failures fall back entirely. API profile responses include `recommendation_status`: `OK`, `PARTIAL`, `INVALID_RESPONSE`, `UNAVAILABLE` or `NOT_CONFIGURED`. Required user configuration and approval remain enforced. Set `DQ_LLM_PROVIDER=offline` to disable external requests.
 
 To enable an OpenAI-compatible chat-completions endpoint, set these environment variables before starting the server:
 
@@ -53,7 +63,7 @@ $env:DQ_LLM_MODEL = "gpt-4o-mini"
 python -m uvicorn backend.app:app --reload
 ```
 
-Only structured profile metadata and rule definitions are sent. Raw rows, samples, top values, numeric/date minima and maxima are excluded. Provider output must be valid JSON referencing known rule IDs and uploaded columns; it is shown as advisory alongside deterministic evidence. A provider timeout or malformed response leaves local rules available. The LLM never decides PASS/FAIL.
+Only structured profile metadata and rule definitions are sent. Raw rows, samples, top values, numeric/date minima and maxima are excluded. Provider output must be valid JSON referencing known rule IDs and uploaded columns; it supplies recommendations after validation against the local rule registry. A provider timeout or malformed response leaves local rules available. The LLM never decides PASS/FAIL.
 
 ## MVP Boundaries
 
@@ -126,3 +136,7 @@ Enter ordinary sentences, one per line, or upload a business-rule document. No A
 The offline interpreter supports required and unique fields, types, numeric comparisons and ranges, approved text values, prefixes, suffixes, text containment, date checks, supported arithmetic formulas, AND/OR clauses, and if/then conditions. It recognizes common wording variations and written numbers. Each interpreted rule includes its source requirement and actual schema column names, and validation runs deterministically.
 
 This is a bounded offline interpreter, so arbitrary natural language is not guaranteed to be understood. Missing limits, equally plausible columns, contradictory ranges, and unsupported conditions are marked Not applied; no values or policies are invented. Edit the original sentence or exclude the notice before validation. Optional AI advice for general profiling is separate from Business Rules and retains its existing configuration.
+
+### Business Rules chat
+
+With Gemini configured, pasted/uploaded Business Rules are interpreted using the Google GenAI chat SDK. The clarification endpoint uses the original requirement as chat history and the clarification as the next message. Chats are scoped to one request; no user or dataset shares conversation state. Only column names and user-provided requirement text are sent for this feature (requirements may contain your own literals). Install updated requirements and restart the backend. Responses must compile completely with the local parser; failed, empty or unsupported responses fall back to Python. Results use `mode: ai_chat` and rule `interpretation_source: AI` when successful. Review the resulting conditions before approving deterministic execution.

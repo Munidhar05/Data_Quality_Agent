@@ -133,17 +133,29 @@ def _profile_with_overrides(metadata: dict[str, Any], frame: pd.DataFrame) -> di
 
 
 def _recommendations(frame: pd.DataFrame, profile: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
-    recommendations = recommend_rules(frame, profile)
+    recommendations = [{**item, "recommendation_source": "RULE_BASED"} for item in recommend_rules(frame, profile)]
     if not llm_provider.configured:
         return recommendations, "NOT_CONFIGURED"
-    provider_response = llm_provider.recommend(metadata_for_llm(profile, discover_rules()))
-    if provider_response.get("status") != "OK":
-        return recommendations, str(provider_response.get("status", "UNAVAILABLE"))
-    advisory = validate_ai_recommendations(provider_response, profile, discover_rules())
+    try:
+        provider_response = llm_provider.recommend(metadata_for_llm(profile, discover_rules()))
+        if not isinstance(provider_response, dict) or provider_response.get("status") != "OK":
+            return recommendations, "UNAVAILABLE"
+        advisory = validate_ai_recommendations(provider_response, profile, discover_rules())
+    except Exception:
+        # Provider failures must never prevent local check selection.
+        return recommendations, "UNAVAILABLE"
     for recommendation in recommendations:
-        if recommendation["rule_id"] in advisory:
-            recommendation["ai_assessment"] = advisory[recommendation["rule_id"]]
-    return recommendations, "OK"
+        assessment = advisory.get(recommendation["rule_id"])
+        if assessment:
+            needs_input = recommendation.get("requires_user_input", False) or assessment["requires_user_input"]
+            recommendation.update(assessment)
+            recommendation["requires_user_input"] = needs_input
+            if needs_input and recommendation["applicability"] in {"RECOMMENDED", "OPTIONAL"}:
+                recommendation["applicability"] = "REQUIRES_USER_INPUT"
+            recommendation["recommendation_source"] = "AI"
+    count = sum(item["recommendation_source"] == "AI" for item in recommendations)
+    return recommendations, "OK" if count == len(recommendations) else "PARTIAL" if count else "INVALID_RESPONSE"
+
 
 
 def _dataset_or_404(dataset_id: str) -> tuple[dict[str, Any], pd.DataFrame]:
@@ -172,16 +184,16 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(error)) from error
     profile = _profile_with_overrides(metadata, frame)
     storage.save_business_context(metadata["dataset_id"], metadata_for_llm(profile, []))
-    recommendations, _ = _recommendations(frame, profile)
-    return {"dataset": metadata, "profile": profile, "recommendations": recommendations, "warnings": []}
+    recommendations, ai_status = _recommendations(frame, profile)
+    return {"dataset": metadata, "profile": profile, "recommendation_status": ai_status, "recommendations": recommendations, "warnings": []}
 
 
 @app.get("/api/datasets/{dataset_id}/profile")
 def get_profile(dataset_id: str) -> dict[str, Any]:
     metadata, frame = _dataset_or_404(dataset_id)
     profile = _profile_with_overrides(metadata, frame)
-    recommendations, _ = _recommendations(frame, profile)
-    return {"dataset": metadata, "profile": profile, "recommendations": recommendations}
+    recommendations, ai_status = _recommendations(frame, profile)
+    return {"dataset": metadata, "profile": profile, "recommendation_status": ai_status, "recommendations": recommendations}
 
 
 @app.get("/api/rules")
@@ -198,6 +210,27 @@ def parse_rule(dataset_id: str, body: BusinessRuleRequest) -> dict[str, Any]:
     return {**result, "status":"NOT_APPLIED", "clarification":item.get("reason", "No executable rule was identified.")}
 
 
+def _interpret_business_text(text: str, columns: list[str], context: dict[str, Any], previous: str | None = None) -> dict[str, Any]:
+    chat = getattr(llm_provider, "business_chat", None)
+    if llm_provider.configured and callable(chat):
+        try:
+            normalized = chat(text, columns, previous=previous)
+            if normalized:
+                result = parse_offline_batch(normalized, columns, context)
+                if result["rules"] and not result["unresolved"]:
+                    for rule in result["rules"]:
+                        rule["interpretation_source"] = "AI"
+                        rule["original_requirement"] = text
+                        rule["conversation_requirement"] = previous
+                    return {**result, "mode": "ai_chat", "message": "Gemini interpreted the requirements. Review all generated rules before approval."}
+        except Exception:
+            pass
+    result = parse_offline_batch(text, columns, context)
+    for rule in result["rules"]:
+        rule["interpretation_source"] = "RULE_BASED"
+    return result
+
+
 def _business_batch(dataset_id: str, text: str) -> dict[str, Any]:
     metadata, frame = _dataset_or_404(dataset_id)
     saved = metadata.get('business_context', {})
@@ -208,7 +241,7 @@ def _business_batch(dataset_id: str, text: str) -> dict[str, Any]:
         context = {**context, 'retrieval_index': build_retrieval_index(context)}
         storage.save_business_context(dataset_id, context)
     try:
-        return parse_offline_batch(text, [str(column) for column in frame.columns], context)
+        return _interpret_business_text(text, [str(column) for column in frame.columns], context)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -223,6 +256,10 @@ def clarify_business_rule(dataset_id: str, body: BusinessClarificationRequest) -
     from backend.business_context import clarify_requirement
     metadata, frame = _dataset_or_404(dataset_id)
     context = metadata.get('business_context', {}).get('metadata') or metadata_for_llm(_profile_with_overrides(metadata, frame), [])
+    if llm_provider.configured and callable(getattr(llm_provider, "business_chat", None)):
+        result = _interpret_business_text(body.clarification, [str(column) for column in frame.columns], context, previous=body.requirement)
+        if result.get("mode") == "ai_chat":
+            return result
     rule = clarify_requirement(body.requirement, body.clarification, [str(column) for column in frame.columns], context)
     if rule:
         return {'rules':[rule], 'unresolved':[], 'mode':'local', 'message':'Clarification interpreted. Review the rule below.'}
@@ -260,8 +297,8 @@ def save_semantic(dataset_id: str, body: SemanticRequest) -> dict[str, Any]:
     path.write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
     profile = _profile_with_overrides(metadata, frame)
     storage.save_business_context(dataset_id, metadata_for_llm(profile, []))
-    recommendations, _ = _recommendations(frame, profile)
-    return {"dataset": metadata, "profile": profile, "recommendations": recommendations}
+    recommendations, ai_status = _recommendations(frame, profile)
+    return {"dataset": metadata, "profile": profile, "recommendation_status": ai_status, "recommendations": recommendations}
 
 
 def _validate_business_rule(frame: pd.DataFrame, rule: dict[str, Any], ordinal: int) -> list[dict[str, Any]]:
