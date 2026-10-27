@@ -67,6 +67,7 @@ window.addEventListener('beforeunload', event => {
 function setWorkspaceUser(user) {
   if (state.userId !== String(user.id)) {
     state.dataset = null; state.profile = null; state.lastRun = null; state.downloadNames = {}; state.reviewDraft = null; state.businessRules = []; state.businessClarifications = []; state.businessDocumentFailure = null;
+    window.dispatchEvent(new Event('dq-account-change'));
     ['review-page-content', 'business-page-content', 'results-page-content', 'profile-page-content'].forEach(id => byId(id).replaceChildren());
     byId('welcome-upload').classList.remove('hidden'); byId('workspace-content').classList.add('hidden');
     byId('upload-heading').textContent = 'Upload your file';
@@ -472,29 +473,7 @@ async function uploadDataset(file) {
     const data = new FormData();
     data.append('file', file);
     const payload = await api('/api/datasets', { method: 'POST', body: data });
-    state.lastRun = null;
-    state.dataset = payload.dataset;
-    state.profile = payload.profile;
-    state.recommendations = payload.recommendations;
-    state.businessRules = []; state.businessClarifications = [];
-    state.businessDocumentFailure = null;
-    state.reviewDraft = null;
-    state.explorerSearch = '';
-    state.explorerSort = { column: '', direction: 'asc' };
-    state.explorerOffset = 0;
-
-    byId('review-page-content').replaceChildren();
-    byId('business-page-content').replaceChildren();
-    byId('results-page-content').replaceChildren();
-    byId('welcome-upload').classList.add('hidden');
-    byId('workspace-content').classList.remove('hidden');
-    byId('notice').classList.add('hidden');
-    renderOverview();
-    byId('upload-heading').textContent = 'Your file is ready';
-    byId('upload-help').textContent = [...(state.dataset.import_notes || []), 'Review the summary below, then choose your checks.'].join(' ');
-    agentProgress(2, 'Profiling complete. Suggested tests are ready.', 'Explore the profile below, then choose tests and add your business rules.');
-    showPage('overview');
-    toast(`Profiled ${payload.dataset.name} · ${numberFormat(payload.profile.row_count)} rows, ${payload.profile.column_count} columns`);
+    acceptImportedDataset(payload);
   } catch (error) {
     agentProgress(state.dataset ? 2 : 0, 'Unable to profile this file', error.message + ' Try again or choose another file.', false, true);
     showNotice(error.message, 'error');
@@ -508,7 +487,9 @@ function renderOverview() {
   byId('upload-help').textContent = [...(state.dataset?.import_notes || []), 'Review the summary below, then choose your checks.'].join(' ');
   const profile = state.profile;
   byId('active-dataset-name').textContent = state.dataset.filename || state.dataset.name;
-  byId('active-dataset-source').textContent = state.dataset.filename || '';
+  const table = state.dataset.source?.table;
+  document.querySelector('.dataset-name-block .eyebrow').textContent = table ? 'YOUR TABLE' : 'YOUR FILE';
+  byId('active-dataset-source').textContent = table ? (state.dataset.source.kind === 'databricks' ? 'Databricks table' : state.dataset.source.kind.replaceAll('_', ' ') + ' table') : state.dataset.filename || '';
   const uploadMetrics = [
     { label: 'Total Records', value: profile.row_count, icon: 'M4 5c0-3 16-3 16 0s-16 3-16 0M4 5v14c0 3 16 3 16 0V5M4 12c0 3 16 3 16 0' },
     { label: 'Total Columns', value: profile.column_count, icon: 'M3 4h18v16H3zM9 4v16M15 4v16' },
@@ -1397,4 +1378,31 @@ async function downloadErrorDetails() {
     saveDownload(await response.blob(), `${run.dataset_name || 'validation'}_errors.pdf`);
   } catch (error) { toast(error.message, true); }
   finally { button.disabled = false; }
+}
+
+function acceptImportedDataset(payload) {
+    if (byId('schema-feedback')) byId('schema-feedback').textContent = '';
+    state.lastRun = null;
+    state.dataset = payload.dataset;
+    state.profile = payload.profile;
+    state.recommendations = payload.recommendations;
+    state.businessRules = []; state.businessClarifications = [];
+    state.businessDocumentFailure = null;
+    state.reviewDraft = null;
+    state.explorerSearch = '';
+    state.explorerSort = { column: '', direction: 'asc' };
+    state.explorerOffset = 0;
+
+    byId('review-page-content').replaceChildren();
+    byId('business-page-content').replaceChildren();
+    byId('results-page-content').replaceChildren();
+    byId('welcome-upload').classList.add('hidden');
+    byId('workspace-content').classList.remove('hidden');
+    byId('notice').classList.add('hidden');
+    renderOverview();
+    byId('upload-heading').textContent = 'Your file is ready';
+    byId('upload-help').textContent = [...(state.dataset.import_notes || []), 'Review the summary below, then choose your checks.'].join(' ');
+    agentProgress(2, 'Profiling complete. Suggested tests are ready.', 'Explore the profile below, then choose tests and add your business rules.');
+    showPage('overview');
+    toast(`Profiled ${payload.dataset.name} · ${numberFormat(payload.profile.row_count)} rows, ${payload.profile.column_count} columns`);
 }

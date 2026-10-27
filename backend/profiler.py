@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import math
 from collections import Counter
 from typing import Any
 
@@ -44,6 +45,8 @@ def _safe_value(value: Any) -> Any:
         return value.isoformat()
     if hasattr(value, "item"):
         value = value.item()
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return str(value)

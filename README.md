@@ -10,7 +10,7 @@ From this project directory, in PowerShell:
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-python -m uvicorn backend.app:app --reload
+python -m uvicorn backend.app:app --reload --reload-dir backend
 ```
 
 Open <http://127.0.0.1:8000>. The API docs are at <http://127.0.0.1:8000/docs>.
@@ -60,7 +60,7 @@ To enable an OpenAI-compatible chat-completions endpoint, set these environment 
 $env:DQ_LLM_API_KEY = "your-provider-key"
 $env:DQ_LLM_BASE_URL = "https://api.openai.com/v1"
 $env:DQ_LLM_MODEL = "gpt-4o-mini"
-python -m uvicorn backend.app:app --reload
+python -m uvicorn backend.app:app --reload --reload-dir backend
 ```
 
 Only structured profile metadata and rule definitions are sent. Raw rows, samples, top values, numeric/date minima and maxima are excluded. Provider output must be valid JSON referencing known rule IDs and uploaded columns; it supplies recommendations after validation against the local rule registry. A provider timeout or malformed response leaves local rules available. The LLM never decides PASS/FAIL.
@@ -91,7 +91,7 @@ Administration at `/admin` requires an explicitly configured `DQ_ADMIN_PASSWORD`
 
 ```powershell
 $env:DQ_ADMIN_PASSWORD = "replace-with-your-private-admin-password"
-python -m uvicorn backend.app:app --reload
+python -m uvicorn backend.app:app --reload --reload-dir backend
 ```
 
 Users who forget their password should contact the workspace administrator. The administrator can set a replacement password through Edit user; existing sessions are revoked when an account is updated. There is no email-based self-service reset in this local application.
@@ -140,3 +140,11 @@ This is a bounded offline interpreter, so arbitrary natural language is not guar
 ### Business Rules chat
 
 With Gemini configured, pasted/uploaded Business Rules are interpreted using the Google GenAI chat SDK. The clarification endpoint uses the original requirement as chat history and the clarification as the next message. Chats are scoped to one request; no user or dataset shares conversation state. Only column names and user-provided requirement text are sent for this feature (requirements may contain your own literals). Install updated requirements and restart the backend. Responses must compile completely with the local parser; failed, empty or unsupported responses fall back to Python. Results use `mode: ai_chat` and rule `interpretation_source: AI` when successful. Review the resulting conditions before approving deterministic execution.
+
+## Connected sources and schema changes
+
+Choose a connection beside Choose file, then enter that provider's connection details and credentials directly in the UI. API, Databricks, AWS, Azure, Google Cloud and database imports use request-scoped credentials without requiring .env source definitions. Existing server-configured source integrations remain available. Schema comparisons work for uploads and imports. See [setup, supported options and limits](CONNECTORS.md).
+
+### Repeated reloads during dependency installation
+
+The development server watches backend source files only. If an older running server reports WatchFiles changes inside .venv followed by KeyboardInterrupt traces, stop it with Ctrl+C, finish installing dependencies, and restart it. From the project root, use `.venv/Scripts/python.exe backend/app.py` (port 8080), or `python -m uvicorn backend.app:app --reload --reload-dir backend` (port 8000). From backend, use `../.venv/Scripts/python.exe app.py`. The updated reload configuration takes effect after restarting the old watcher.

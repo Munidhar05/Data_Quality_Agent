@@ -963,3 +963,47 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #6b4e3c; pa
 
 .business-rule-item .business-edit-buttons .button-primary { color:#292524; }
 .business-rule-item .business-edit-buttons .button-quiet { color:#655044; }
+
+.source-panel {margin: 1rem 0; padding: 1rem; border: 1px solid #ccd5df; border-radius: 8px;}
+.source-panel form {display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin-top: 1rem;}
+.source-panel label {display: grid; gap: .35rem; max-width: 100%;}
+.source-panel input, .source-panel select, .source-panel textarea {padding: .5rem; max-width: 100%;}
+.source-panel pre {white-space: pre-wrap; overflow-wrap: anywhere; max-height: 32rem; overflow: auto;}
+
+.upload-actions {display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:start;gap:20px;width:100%;max-width:760px;}
+.upload-or {height:48px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#76675c;}
+#page-overview .upload-actions .file-picker {min-width:0;width:100%;}
+#page-overview .upload-actions .file-picker span {height:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;}
+.upload-actions .file-picker small {max-width:100%;}
+.connection-picker {display:grid;text-align:left;min-width:0;width:100%;max-width:100%;font-size:13px;font-weight:600;}
+.connection-picker select {padding:13px 16px;border:1px solid #c6bdb5;border-radius:8px;background:white;color:#3d3027;font:inherit;height:48px;box-sizing:border-box;min-width:0;width:100%;max-width:100%;}
+.connection-form {width:100%;max-width:760px;text-align:left;border-top:1px solid #ded7d0;padding-top:20px;}
+.connection-form h3 {margin:0 0 18px;font-size:18px;}
+.connection-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+.connection-form label {display:grid;gap:7px;min-width:0;font-size:13px;font-weight:600;}
+.connection-form input,.connection-form select,.connection-form textarea {width:100%;min-width:0;padding:11px 12px;border:1px solid #c6bdb5;border-radius:7px;background:white;color:#312720;font:inherit;box-sizing:border-box;}
+.connection-extra,.connection-options {grid-column:1/-1;margin:8px 0;}
+.connection-extra summary,.connection-options summary {cursor:pointer;font-size:13px;color:#655044;margin-bottom:12px;}
+.connection-options label {margin:12px 0;max-width:360px;}
+.connection-privacy {font-size:12px;color:#76675c;margin:16px 0;}
+.connection-secret {-webkit-text-security:disc;}
+#source-feedback {overflow-wrap:anywhere;font-size:13px;}
+@media(max-width:650px){.connection-fields {grid-template-columns:1fr;}.upload-actions {gap:10px;}.upload-actions .connection-picker select {padding:8px;font-size:12px;}.upload-actions .file-picker small {font-size:10px;}.connection-picker {min-width:0;width:100%;}}
+
+.schema-check-card {margin:20px 0;padding:24px;border:1px solid #e3d8ce;border-radius:12px;background:#fffaf6;text-align:left;}
+.schema-check-card > summary {cursor:pointer;font-size:16px;font-weight:600;}
+.schema-check-card[open] > summary {margin-bottom:16px;}
+.schema-check-card > summary:focus-visible {outline:2px solid var(--orange);outline-offset:5px;border-radius:3px;}
+.schema-check-heading p,.schema-match-row p {color:#76675c;line-height:1.5;}
+#schema-compare-form {display:grid;gap:12px;}
+#schema-compare-form label {font-size:13px;font-weight:600;}
+#schema-description {width:100%;box-sizing:border-box;border:1px solid #c6bdb5;border-radius:8px;padding:12px;font:inherit;resize:vertical;min-height:90px;}
+#schema-compare-form button {justify-self:start;}
+.schema-check-summary {font-weight:600;margin-top:20px;}
+.schema-match-list {display:grid;gap:10px;}
+.schema-match-row {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;padding:14px;border:1px solid #e3d8ce;border-radius:8px;background:white;overflow-wrap:anywhere;}
+.schema-match-row p,.schema-match-row label {grid-column:1/-1;margin:0;font-size:13px;}
+.schema-match-row label {display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+.schema-match-row select {padding:7px;border:1px solid #c6bdb5;border-radius:6px;max-width:100%;}
+.schema-match-status {font-size:12px;font-weight:600;color:#655044;}
+@media(max-width:650px){.schema-check-card {padding:16px;}.schema-match-row {grid-template-columns:minmax(0,1fr);}.schema-match-row>* {grid-column:1;}}

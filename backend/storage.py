@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import io
+import csv
+import os
 import re
 import uuid
 from contextvars import ContextVar
@@ -54,6 +57,21 @@ class LocalFileStorage(DatasetStorage):
             suffix = ".csv"
         if len(content) > MAX_UPLOAD_BYTES:
             raise ValueError("Imported data exceeds 50 MB. Upload a smaller extract.")
+        # Validate all formats before persisting the upload.
+        try:
+            if suffix == '.csv':
+                header = next(csv.reader(io.StringIO(content.decode('utf-8-sig'))), [])
+                if not header or len(header) != len(set(header)) or any(not name.strip() for name in header):
+                    raise ValueError('Column names must be non-empty and unique.')
+                frame = pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False)
+            else:
+                frame = pd.read_parquet(io.BytesIO(content))
+            if frame.empty or not len(frame.columns) or len(set(map(str, frame.columns))) != len(frame.columns):
+                raise ValueError('Source needs records and unique column names.')
+        except ValueError:
+            raise
+        except Exception:
+            raise ValueError('Source is not a valid tabular file.') from None
         dataset_id = uuid.uuid4().hex
         safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(filename).stem).strip("._") or "dataset"
         destination = UPLOAD_DIR / f"{dataset_id}{suffix}"
@@ -62,6 +80,24 @@ class LocalFileStorage(DatasetStorage):
         metadata = {"dataset_id": dataset_id, "name": safe_name, "filename": original_filename, "owner_id": ACTIVE_OWNER.get(), "import_notes": notes}
         (UPLOAD_DIR / f"{dataset_id}.json").write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
         return {**metadata, "path": str(destination)}
+
+    def update_metadata(self, dataset_id: str, updates: dict[str, Any]) -> None:
+        metadata = self.dataset_metadata(dataset_id)
+        if set(updates) - {'source', 'observed_schema', 'name', 'filename'}:
+            raise ValueError('Unsupported metadata update.')
+        metadata.update(updates)
+        path = UPLOAD_DIR / f'{dataset_id}.json'
+        temporary = path.with_name(f'{dataset_id}.{uuid.uuid4().hex}.tmp')
+        try:
+            temporary.write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf-8')
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def discard_dataset(self, dataset_id: str) -> None:
+        self.dataset_metadata(dataset_id)
+        for suffix in ('.csv', '.parquet', '.pq', '.json'):
+            (UPLOAD_DIR / f'{dataset_id}{suffix}').unlink(missing_ok=True)
 
     def save_business_context(self, dataset_id: str, context: dict[str, Any]) -> None:
         metadata = self.dataset_metadata(dataset_id)
@@ -99,7 +135,9 @@ class LocalFileStorage(DatasetStorage):
                     elif values.str.lower().isin(["true", "false"]).all():
                         frame[column] = frame[column].str.lower().map({"true": True, "false": False})
                 return frame
-            return pd.read_parquet(path)
+            frame = pd.read_parquet(path).reset_index(drop=True)
+            frame.columns = frame.columns.map(str)
+            return frame
         except Exception as error:
             raise ValueError(f"The uploaded file could not be read as {path.suffix[1:].upper()}. Check that it is a valid, non-empty tabular file.") from error
 
@@ -110,6 +148,14 @@ class LocalFileStorage(DatasetStorage):
         if path.exists():
             metadata = json.loads(path.read_text(encoding="utf-8"))
             authorize(metadata)
+            # Existing table imports retain their full source identity, but display
+            # only the Databricks table component rather than catalog.schema.table.
+            source = metadata.get('source', {})
+            table = source.get('table')
+            if source.get('kind') == 'databricks' and isinstance(table, str) and metadata.get('filename') == table:
+                table_name = table.rsplit('.', 1)[-1]
+                metadata['filename'] = table_name
+                metadata['name'] = re.sub(r'[^A-Za-z0-9._-]+', '_', table_name).strip('._') or 'dataset'
             # Legacy uploads stored their internal ID as the visible filename.
             filename = metadata.get("filename", "")
             if Path(filename).stem == dataset_id and metadata.get("name") != dataset_id:

@@ -41,6 +41,8 @@ llm_provider = provider_from_environment()
 SEMANTIC_TYPES = {"UNKNOWN", "IDENTIFIER", "EMAIL", "PHONE", "NAME", "DATE", "TIMESTAMP", "CURRENCY", "AMOUNT", "PERCENTAGE", "STATUS", "CATEGORY", "ADDRESS", "COUNTRY", "STATE", "POSTAL_CODE", "BOOLEAN", "FOREIGN_KEY", "DESCRIPTION", "NUMERIC_MEASURE"}
 app = FastAPI(title="Feuji Data Quality Agent", version=ENGINE_VERSION, description="Metadata-driven, human-approved data quality validation.")
 app.mount("/static", StaticFiles(directory=FRONTEND_ROOT), name="static")
+from backend.source_routes import router as source_router
+app.include_router(source_router)
 app.include_router(auth_router)
 app.include_router(admin_login_router)
 app.include_router(admin_router)
@@ -508,4 +510,11 @@ def get_rows(dataset_id: str, offset: int = 0, limit: int = 50, search: str = ""
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("backend.app:app", host="127.0.0.1", port=8080, reload=True, reload_dirs=[str(APP_ROOT)])
+    # Watch application code only; dependency installs must not restart workers.
+    uvicorn.run(
+        "backend.app:app", host="127.0.0.1", port=8080,
+        reload=True,
+        reload_dirs=[str(APP_ROOT / "backend")],
+        reload_includes=["*.py", "*.json"],
+        reload_excludes=[str(APP_ROOT / ".venv"), str(APP_ROOT / "datasets")],
+    )

@@ -128,6 +128,8 @@ def run():
                         page.wait_for_function("!document.body.classList.contains('auth-pending') && document.querySelector('.rail-link[aria-current]')")
                         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), url
                     print("PASS results navigation, score, history filenames, catalog, mobile overflow")
+                    # Resume desktop checks after exercising the mobile viewport.
+                    page.set_viewport_size({"width":1440,"height":900})
                     page.goto(run_url);expect(page.locator("#dq-summary-report")).to_be_visible()
                     page.locator(".dq-audit-details summary").click()
                     page.evaluate("window.auditFailures = Array.from({length: 601}, (_, i) => ({rule_name: 'Test', column: 'amount', reason: 'Invalid', actual_value: i === 0 ? 0 : i === 1 ? false : i === 2 ? '' : i, status: 'FAIL', row_index: i})); renderFailures(window.auditFailures)")
